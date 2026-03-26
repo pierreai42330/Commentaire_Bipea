@@ -6,10 +6,8 @@ import io
 st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
 
 st.title("🍞 Générateur de Commentaires Marion")
-st.write("Analyse automatique selon les protocoles BIPÉA.")
 
 # 1. Barre latérale
-st.sidebar.header("Configuration")
 type_p = st.sidebar.selectbox(
     "Type de produit :",
     ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"]
@@ -50,68 +48,62 @@ if uploaded_file:
         note_totale = float(df.iloc[35, 5]) # F36
 
         # --- PARAMÈTRES TECHNIQUES ---
-        # Pétrissage (P)
         lis = ex_label("Lissage")
+        # Pétrissage (P)
         col_p = ex_label("Collant de la pâte")
         con_p = ex_label("Consistance")
         ext_p = ex_label("Extensibilité")
         ela_p = ex_label("Elasticité")
         rel_p = ex_label("Relâchement")
-        
         # Façonnage (F)
-        col_f = ex_score(20) # Ligne 21, colonne Collant (index 20 souvent selon ton Excel)
-        con_f = ex_score(19) # Ligne 20
-        ext_f = ex_score(21) # Ligne 22
-        ela_f = ex_score(23) # Ligne 24
-
+        col_f = ex_score(20) 
+        con_f = ex_score(19) 
+        ext_f = ex_score(21) 
+        ela_f = ex_score(23)
         # Pain
-        t1 = ex_score(30)
-        t2 = ex_score(31)
-        sec_v = ex_score(33) 
-        col_v = ex_score(34) 
-        dev_v = ex_score(37) 
-        reg_v = ex_score(38) 
-        dec_v = ex_score(39) 
+        t1, t2 = ex_score(30), ex_score(31)
+        sec_v, col_v = ex_score(33), ex_score(34) 
+        dev_v, reg_v, dec_v = ex_score(37), ex_score(38), ex_score(39) 
 
         # --- RÉDACTION ---
         
         # 1. Hydratation & Lissage
-        if type_p == "Blé de force":
-            h_txt = "Bonne hydratation" if hydra >= 63 else "Assez bonne hydratation" if hydra >= 61 else "Hydratation satisfaisante" if hydra >= 60 else "Hydratation un peu faible"
-        else:
-            h_txt = "Bonne hydratation" if hydra >= 61 else "Assez bonne hydratation" if hydra >= 60 else "Hydratation satisfaisante" if hydra >= 58 else "Hydratation un peu faible"
-        
+        h_lim = 63 if type_p == "Blé de force" else 61
+        h_txt = "Bonne hydratation" if hydra >= h_lim else "Assez bonne hydratation" if hydra >= (h_lim-2) else "Hydratation satisfaisante"
         l_txt = {10: "bon lissage", 7: "lissage un peu rapide", -7: "lissage un peu lent"}.get(lis, "lissage correct")
 
-        # 2. Comportement Pâte (Synthèse Pétrissage + Façonnage)
-        # On vérifie si TOUT est identique entre P et F
+        # 2. Construction des listes de défauts sans répétition de "pâte"
+        def get_details(c, co, ex, el):
+            d = []
+            if c in [7, 4]: d.append("collante" if c==7 else "très collante")
+            if co != 10: d.append(f"en {desc_defaut(co)} de consistance")
+            if ex != 10: d.append(f"en {desc_defaut(ex)} d'extensibilité")
+            if el != 10: d.append(f"en {desc_defaut(el)} d'élasticité")
+            return d
+
+        p_list = get_details(col_p, con_p, ext_p, ela_p)
+        f_list = get_details(col_f, con_f, ext_f, ela_f)
+        
+        rel_msg = " et relâchante après détente" if rel_p == 7 else ""
         identique = (ext_f == ext_p and ela_f == ela_p and col_f == col_p and con_f == con_p)
 
-        p_details = []
-        if col_p in [7, 4]: p_details.append("pâte collante" if col_p==7 else "pâte très collante")
-        if con_p != 10: p_details.append(f"pâte en {desc_defaut(con_p)} de consistance")
-        if ext_p != 10: p_details.append(f"pâte en {desc_defaut(ext_p)} d'extensibilité")
-        if ela_p != 10: p_details.append(f"pâte en {desc_defaut(ela_p)} d'élasticité")
-        
         if identique:
-            comportement_txt = "Pâte " + (", ".join(p_details) if p_details else "équilibrée") + " gardant le même profil tout au long du processus."
+            p_str = ", ".join(p_list[:-1]) + " et " + p_list[-1] if len(p_list) > 1 else (p_list[0] if p_list else "équilibrée")
+            comportement_txt = f"Pâte {p_str}{rel_msg} gardant le même profil tout au long du processus."
         else:
-            # On détaille les deux étapes si ça change
-            debut = "En fin de pétrissage, pâte " + (", ".join(p_details) if p_details else "équilibrée") + "."
-            f_details = []
-            if col_f in [7, 4]: f_details.append("collante" if col_f==7 else "très collante")
-            if con_f != 10: f_details.append(f"{desc_defaut(con_f)} de consistance")
-            if ext_f != 10: f_details.append(f"{desc_defaut(ext_f)} d'extensibilité")
-            if ela_f != 10: f_details.append(f"{desc_defaut(ela_f)} d'élasticité")
-            fin = " Au façonnage, pâte " + (", ".join(f_details) if f_details else "équilibrée") + "."
+            # Pétrissage
+            p_str = ", ".join(p_list[:-1]) + " et " + p_list[-1] if len(p_list) > 1 else (p_list[0] if p_list else "équilibrée")
+            debut = f"En fin de pétrissage, pâte {p_str}."
+            # Façonnage
+            f_str = ", ".join(f_list[:-1]) + " et " + f_list[-1] if len(f_list) > 1 else (f_list[0] if f_list else "équilibrée")
+            fin = f" Au façonnage, pâte {f_str}{rel_msg}."
             comportement_txt = debut + fin
 
-        # Relâchement & Tenue
-        rel_txt = " Pâte relâchante après détente." if rel_p == 7 else ""
+        # Tenue
         def desc_t(score): return {-7: "manque de tenue", -4: "manque important de tenue"}.get(score, "bonne tenue")
         t_txt = f" {desc_t(t1).capitalize()} au premier enfournement et {desc_t(t2)} au second." if (t1 != 10 or t2 != 10) else " Bonne tenue aux deux enfournements."
 
-        # 3. Aspect
+        # 3. Aspect & Volume
         a_base = "Très bel aspect du pain" if note_aspect > 65 else "Bel aspect du pain" if note_aspect > 60 else "Assez bel aspect du pain" if note_aspect > 50 else "Aspect correct du pain"
         suite_aspect = []
         if sec_v != 10: suite_aspect.append(f"un {desc_defaut(sec_v)} de section")
@@ -124,18 +116,12 @@ if uploaded_file:
         final_aspect = a_base
         if suite_aspect:
             final_aspect += " avec " + (", ".join(suite_aspect[:-1]) + " et " + suite_aspect[-1] if len(suite_aspect) > 1 else suite_aspect[0])
-        color_txt = f" {desc_defaut(col_v).capitalize()} de coloration de la croûte." if col_v != 10 else ""
-
-        # 4. Volume
-        if type_p == "Farine corrigée":
-            v_lib = "Très bon volume" if volume_val > 2000 else "Bon volume" if volume_val > 1900 else "Assez bon volume"
-        else:
-            v_lib = "Bon volume" if volume_val > 1600 else "Assez bon volume" if volume_val > 1500 else "Volume satisfaisant"
+        
+        v_lib = "Très bon volume" if volume_val > 1800 else "Bon volume" if volume_val > 1600 else "Assez bon volume"
 
         # --- AFFICHAGE ---
         st.divider()
-        st.success(f"{h_txt}, {l_txt}. {comportement_txt}{rel_txt}{t_txt}\n\n{final_aspect}.{color_txt} {v_lib}.")
-        
+        st.success(f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}\n\n{final_aspect}. {v_lib}.")
         st.info(f"**Données :** Note Totale: **{note_totale}** | Pâte: **{note_pate}** | Aspect: **{note_aspect}** | Volume: **{volume_val}** | Hydra: **{hydra}%**")
 
     except Exception as e:
