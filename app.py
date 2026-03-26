@@ -4,9 +4,9 @@ import io
 import streamlit.components.v1 as components
 
 # 1. CONFIGURATION DE LA PAGE
-st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
+st.set_page_config(page_title="Commentaire de Bipéa", page_icon="🍞")
 
-st.title("🍞 Générateur de Commentaires Marion")
+st.title("🍞 Générateur de Commentaires")
 
 # 2. BARRE LATÉRALE (LANGUE & TYPE)
 st.sidebar.header("Configuration")
