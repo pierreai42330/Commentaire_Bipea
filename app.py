@@ -37,7 +37,7 @@ tr = {
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "sec": "de section", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
-        "collant": "collante", "collant_imp": "très collante", "cons": "de consistance", "ext": "d'extensibilité", "ela": "d'élasticité",
+        "collant": "collante", "collant_imp": "très collante", "cons": "de consistance", "ext": "d'extensibilité", "ela": "d'élasticité", "rel": "relâchante",
         "and": "et", "copy_btn": "📋 Copier le commentaire", "copy_ok": "Copié !"
     }
 }
@@ -85,10 +85,17 @@ if uploaded_file:
         m3.metric("Note Aspect", f"{n_asp:.1f}/70")
         m4.metric("Valeur Volume", f"{int(vol)} cm³")
 
-        # Extraction des paramètres
+        # --- EXTRACTION ---
         lis = find_label_score(df, "Lissage", c_map)
+        
+        # Pétrissage
         cp, conp, extp, elap = find_label_score(df, "Collant", c_map), find_label_score(df, "Consistance", c_map), find_label_score(df, "Extensibilité", c_map), find_label_score(df, "Elasticité", c_map)
+        relp = find_label_score(df, "Relâchement", c_map) # Ajout Relâchement
+        
+        # Façonnage (Lignes fixes 19 à 24)
         cf, conf, extf, elaf = get_score(df, 20, c_map), get_score(df, 19, c_map), get_score(df, 21, c_map), get_score(df, 23, c_map)
+        relf = get_score(df, 24, c_map) # Ajout Relâchement façonnage
+        
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
         sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
 
@@ -97,21 +104,21 @@ if uploaded_file:
         h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
 
-        # 2. Pâte (Logique de comparaison stricte)
-        def fmt_p(c, co, ex, el):
+        # 2. Pâte (Logique Relâchement incluse)
+        def fmt_p(c, co, ex, el, r):
             res = []
             if c == 7: res.append(t["collant"])
             elif c == 4: res.append(t["collant_imp"])
             if co != 10: res.append(f"{get_intensity(co, 'pate')} {t['cons']}")
             if ex != 10: res.append(f"{get_intensity(ex, 'pate')} {t['ext']}")
             if el != 10: res.append(f"{get_intensity(el, 'pate')} {t['ela']}")
+            if r != 10: res.append(t["rel"]) # Ajout visuel "relâchante"
             return res
         
         def join_l(lst): return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
 
-        pl, fl = fmt_p(cp, conp, extp, elap), fmt_p(cf, conf, extf, elaf)
+        pl, fl = fmt_p(cp, conp, extp, elap, relp), fmt_p(cf, conf, extf, elaf, relf)
         
-        # Comparaison de TOUS les paramètres (y compris le collant)
         if pl == fl:
             pate_txt = f"Pâte {join_l(pl)} {t['same']}."
         else:
@@ -124,7 +131,7 @@ if uploaded_file:
             txt_t2 = "bonne tenue" if t2==10 else f"{get_intensity(t2, 'pate')} de tenue"
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {txt_t2} {t['t_2']}."
 
-        # 4. Aspect (Regroupement coup de lame)
+        # 4. Aspect (Regroupement grigne)
         a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
@@ -144,7 +151,7 @@ if uploaded_file:
         final_asp = a_base
         if s_asp: final_asp += f" {t['with']} " + join_l(s_asp)
         
-        # 5. Coloration
+        # 5. Coloration & Volume
         col_txt = f"{get_intensity(col_v, 'aspect').capitalize()} {t['col']}." if col_v != 10 else ""
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
 
