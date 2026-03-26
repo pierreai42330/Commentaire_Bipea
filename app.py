@@ -41,11 +41,11 @@ if uploaded_file:
                     -7: "manque", -4: "manque important", -1: "manque très important"}.get(s, "")
 
         # --- DONNÉES NUMÉRIQUES ---
-        hydra = float(df.iloc[30, 1])      # B31
-        note_pate = float(df.iloc[30, 5])   # F31
-        note_aspect = float(df.iloc[33, 5]) # F34
-        volume_val = float(df.iloc[33, 1])  # B34
-        note_totale = float(df.iloc[35, 5]) # F36
+        hydra = float(df.iloc[30, 1])      
+        note_pate = float(df.iloc[30, 5])   
+        note_aspect = float(df.iloc[33, 5]) 
+        volume_val = float(df.iloc[33, 1])  
+        note_totale = float(df.iloc[35, 5]) 
 
         # --- PARAMÈTRES TECHNIQUES ---
         lis = ex_label("Lissage")
@@ -87,11 +87,12 @@ if uploaded_file:
         def desc_t(score): return {-7: "manque de tenue", -4: "manque important de tenue"}.get(score, "bonne tenue")
         t_txt = f" {desc_t(t1).capitalize()} au premier enfournement et {desc_t(t2)} au second." if (t1 != 10 or t2 != 10) else " Bonne tenue aux deux enfournements."
 
-        # 3. Aspect, Grigne & Coloration
+        # 3. Aspect & Grigne
         if note_aspect > 65: a_base = "Très bel aspect du pain"
         elif note_aspect > 60: a_base = "Bel aspect du pain"
         elif note_aspect > 50: a_base = "Assez bel aspect du pain"
-        else: a_base = "Aspect correct du pain"
+        elif note_aspect > 30: a_base = "Aspect correct du pain"
+        else: a_base = "Aspect médiocre du pain"
 
         suite_aspect = []
         if sec_v != 10: suite_aspect.append(f"un {desc_defaut(sec_v)} de section")
@@ -101,15 +102,14 @@ if uploaded_file:
         if gr_el: suite_aspect.append(f"un {' et '.join(gr_el)} du coup de lame")
         if dec_v in [7, 4]: suite_aspect.append("un déchirement du coup de lame")
         
-        # Coloration (ajoutée ici)
-        if col_v != 10:
-            suite_aspect.append(f"un {desc_defaut(col_v)} de coloration de la croûte")
-        
         final_aspect = a_base
         if suite_aspect:
             final_aspect += " avec " + format_list(suite_aspect)
         
-        # 4. Volume
+        # 4. Coloration (Simplifiée)
+        color_txt = f" {desc_defaut(col_v).capitalize()} de coloration de la croûte." if col_v != 10 else ""
+
+        # 5. Volume
         if type_p == "Farine corrigée":
             v_lib = "Très bon volume" if volume_val > 2000 else "Bon volume" if volume_val > 1900 else "Assez bon volume"
         else:
@@ -117,7 +117,10 @@ if uploaded_file:
 
         # --- AFFICHAGE ---
         st.divider()
-        st.success(f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}\n\n{final_aspect}. {v_lib}.")
+        # Structure : Aspect. Coloration (si existe). Volume.
+        resultat_final = f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}\n\n{final_aspect}.{color_txt} {v_lib}."
+        
+        st.success(resultat_final)
         
         st.info(f"**Données :** Note Totale: **{note_totale}** | Pâte: **{note_pate}** | Aspect: **{note_aspect}** | Volume: **{volume_val}** | Hydra: **{hydra}%**")
 
