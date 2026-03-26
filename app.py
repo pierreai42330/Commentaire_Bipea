@@ -27,6 +27,7 @@ st.markdown("""
         font-size: 1.15rem !important; 
         font-family: 'Inter', sans-serif; 
         border-radius: 12px; 
+        border: 1px solid #d1d1d6;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -42,7 +43,8 @@ tr = {
         "same": "gardant le même profil tout au long du processus", "rel": "et relâchante après détente",
         "t_good": "Bonne tenue aux deux enfournements.", "t_miss": "en manque de tenue", "t_miss_imp": "en manque important de tenue",
         "t_1": "au premier enfournement", "t_2": "au second",
-        "a_pains": "L'aspect des pains est",
+        "a_pains": "Aspect",
+        "a_pains_end": "des pains",
         "a_very": "très bel", "a_good": "bel", "a_med": "assez bel", "a_cor": "correct", "a_poor": "médiocre",
         "with": "avec", "sec": "de section", "dev": "de développement", "reg": "de régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "de coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
@@ -58,7 +60,7 @@ tr = {
         "same": "maintaining the same profile throughout the process", "rel": "and slackening after resting",
         "t_good": "Good stability during both bakes.", "t_miss": "lacking stability", "t_miss_imp": "significantly lacking stability",
         "t_1": "at the first bake", "t_2": "at the second",
-        "a_pains": "The appearance of the breads is",
+        "a_pains": "The appearance of the breads is", "a_pains_end": "",
         "a_very": "very beautiful", "a_good": "beautiful", "a_med": "fairly beautiful", "a_cor": "correct", "a_poor": "poor",
         "with": "with", "sec": "section", "dev": "development", "reg": "regularity", "grigne": "of the scoring", "dec": "a tearing of the scoring",
         "col": "crust coloring", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
@@ -74,7 +76,7 @@ tr = {
         "same": "manteniendo el mismo perfil durante todo el proceso", "rel": "y relajándose tras el reposo",
         "t_good": "Buena estabilidad en ambas hornadas.", "t_miss": "en falta de estabilidad", "t_miss_imp": "en falta importante de estabilidad",
         "t_1": "en la primera hornada", "t_2": "en la segunda",
-        "a_pains": "El aspecto de los panes es",
+        "a_pains": "El aspecto de los panes es", "a_pains_end": "",
         "a_very": "muy bueno", "a_good": "bueno", "a_med": "bastante bueno", "a_cor": "correcto", "a_poor": "mediocre",
         "with": "con", "sec": "de sección", "dev": "de desarrollo", "reg": "de regularidad", "grigne": "del corte", "dec": "un desgarro del corte",
         "col": "de coloración de la corteza", "v_very": "Muy buen volumen", "v_good": "Buen volumen", "v_sat": "Volumen satisfactorio",
@@ -114,13 +116,9 @@ if uploaded_file:
             return {7: t["exc"], 4: t["exc_imp"], -7: t["manq"], -4: t["manq_imp"]}.get(s, "")
 
         # Données
-        hydra = float(df.iloc[30, 1])
-        n_pate = float(df.iloc[30, 5])
-        n_asp = float(df.iloc[33, 5])
-        vol = float(df.iloc[33, 1])
-        n_tot = float(df.iloc[35, 5])
+        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
 
-        # Affichage des cartes (Pâte sur 100, Aspect sur 70)
+        # Affichage des cartes (Pâte/100, Aspect/70)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(t["m_tot"], f"{n_tot:.1f}/100")
         m2.metric(t["m_pate"], f"{n_pate:.1f}/100")
@@ -178,8 +176,8 @@ if uploaded_file:
         if g_l: s_asp.append(f"{f_lst(g_l)} {t['grigne']}")
         if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        # Construction de la phrase aspect
-        final_asp = f"{t['a_pains']} {a_qual}"
+        # Construction de la phrase aspect souhaitée : "Aspect [correct] des pains avec..."
+        final_asp = f"{t['a_pains']} {a_qual} {t['a_pains_end']}"
         if s_asp: final_asp += f" {t['with']} " + f_lst(s_asp)
         col_txt = f"{d_def(col_v).capitalize()} {t['col']}." if col_v != 10 else ""
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
