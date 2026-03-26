@@ -3,9 +3,9 @@ import pandas as pd
 import io
 
 # Configuration de la page
-st.set_page_config(page_title="Générateur commentaire du Bipéa AIT", page_icon="🍞")
+st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
 
-st.title("🍞 Générateur de Commentaires Bipéa")
+st.title("🍞 Générateur de Commentaires Marion")
 
 # 1. Barre latérale
 type_p = st.sidebar.selectbox(
@@ -106,23 +106,28 @@ if uploaded_file:
         if suite_aspect:
             final_aspect += " avec " + format_list(suite_aspect)
         
-        # 4. Coloration (Simplifiée)
-        color_txt = f" {desc_defaut(col_v).capitalize()} de coloration de la croûte." if col_v != 10 else ""
+        # 4. Coloration
+        color_txt = f"{desc_defaut(col_v).capitalize()} de coloration de la croûte." if col_v != 10 else ""
 
         # 5. Volume
-        if type_p == "Farine corrigée":
-            v_lib = "Très bon volume" if volume_val > 2000 else "Bon volume" if volume_val > 1900 else "Assez bon volume"
-        else:
-            v_lib = "Bon volume" if volume_val > 1600 else "Assez bon volume" if volume_val > 1500 else "Volume satisfaisant"
+        v_lib = "Très bon volume" if volume_val > 1850 else "Bon volume" if volume_val > 1650 else "Assez bon volume"
 
-        # --- AFFICHAGE ---
+        # --- AFFICHAGE ET COPIE ---
         st.divider()
-        # Structure : Aspect. Coloration (si existe). Volume.
-        resultat_final = f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}\n\n{final_aspect}.{color_txt} {v_lib}."
+        st.subheader("📝 Commentaire généré")
         
-        st.success(resultat_final)
+        # Construction du texte final
+        paragraphe_1 = f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}"
+        paragraphe_2 = f"{final_aspect}. {color_txt} {v_lib}."
+        commentaire_complet = f"{paragraphe_1}\n\n{paragraphe_2}"
         
-        st.info(f"**Données :** Note Totale: **{note_totale}** | Pâte: **{note_pate}** | Aspect: **{note_aspect}** | Volume: **{volume_val}** | Hydra: **{hydra}%**")
+        # Zone de texte pour copie facile
+        st.text_area("Vous pouvez copier ou modifier le texte ci-dessous :", 
+                     value=commentaire_complet, 
+                     height=150)
+        
+        # Rappel des scores pour vérification rapide
+        st.info(f"**Notes :** Totale {note_totale} | Pâte {note_pate} | Aspect {note_aspect} | Volume {volume_val}")
 
     except Exception as e:
         st.error(f"Erreur : {e}")
