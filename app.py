@@ -97,7 +97,7 @@ if uploaded_file:
         h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
 
-        # 2. Pâte
+        # 2. Pâte (Correction : "Pâte..." si profil identique)
         def fmt_p(c, co, ex, el):
             res = []
             if c == 7: res.append(t["collant"])
@@ -110,7 +110,12 @@ if uploaded_file:
         def join_l(lst): return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
 
         pl, fl = fmt_p(cp, conp, extp, elap), fmt_p(cf, conf, extf, elaf)
-        pate_txt = f"{t['p_fin']} {join_l(pl)}. {t['f_fac']} {join_l(fl)}." if pl != fl else f"{t['p_fin']} {join_l(pl)} {t['same']}."
+        
+        if pl == fl:
+            # On retire "En fin de pétrissage" pour un début direct
+            pate_txt = f"Pâte {join_l(pl)} {t['same']}."
+        else:
+            pate_txt = f"{t['p_fin']} {join_l(pl)}. {t['f_fac']} {join_l(fl)}."
 
         # 3. Tenue
         if t1==10 and t2==10: ten_txt = f" {t['t_good']}."
@@ -119,21 +124,16 @@ if uploaded_file:
             txt_t2 = "bonne tenue" if t2==10 else f"{get_intensity(t2, 'pate')} de tenue"
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {txt_t2} {t['t_2']}."
 
-        # 4. Aspect (Correction : Regroupement Coup de Lame)
-        if n_asp >= 65: a_base = t["a_very"]
-        elif n_asp >= 60: a_base = t["a_good"]
-        elif n_asp >= 50: a_base = t["a_med"]
-        elif n_asp >= 30: a_base = t["a_cor"]
-        else: a_base = t["a_poor"]
+        # 4. Aspect (Regroupement grigne)
+        a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
         if sec_v != 10: s_asp.append(f"{get_intensity(sec_v, 'aspect')} {t['sec']}")
         
-        # Logique de regroupement pour le coup de lame
         if dev_v != 10 or reg_v != 10:
-            if dev_v == reg_v: # Même intensité (ex: -7 et -7)
+            if dev_v == reg_v:
                 s_asp.append(f"{get_intensity(dev_v, 'aspect')} de {t['dev']} {t['and']} de {t['reg']} {t['grigne']}")
-            else: # Intensités différentes
+            else:
                 temp_g = []
                 if dev_v != 10: temp_g.append(f"{get_intensity(dev_v, 'aspect')} de {t['dev']}")
                 if reg_v != 10: temp_g.append(f"{get_intensity(reg_v, 'aspect')} de {t['reg']}")
@@ -148,6 +148,7 @@ if uploaded_file:
         col_txt = f"{get_intensity(col_v, 'aspect').capitalize()} {t['col']}." if col_v != 10 else ""
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
 
+        # --- ASSEMBLAGE ---
         res_final = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{final_asp}. {col_txt} {v_txt}."
 
         st.subheader("📝 Commentaire Final")
