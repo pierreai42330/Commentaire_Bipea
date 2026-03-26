@@ -3,9 +3,9 @@ import pandas as pd
 import io
 
 # Configuration de la page
-st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
+st.set_page_config(page_title="Commentaire Bipéa", page_icon="🍞")
 
-st.title("🍞 Générateur de Commentaires Marion")
+st.title("🍞 Commentaire Bipéa")
 st.write("Analyse automatique selon les protocoles BIPÉA.")
 
 # 1. Barre latérale pour le choix du produit
