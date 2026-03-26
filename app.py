@@ -3,9 +3,9 @@ import pandas as pd
 import io
 
 # Configuration de la page
-st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
+st.set_page_config(page_title="Générateur commentaire du Bipéa AIT", page_icon="🍞")
 
-st.title("🍞 Générateur de Commentaires Marion")
+st.title("🍞 Générateur de Commentaires Bipéa")
 
 # 1. Barre latérale
 type_p = st.sidebar.selectbox(
