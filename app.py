@@ -1,17 +1,38 @@
 import streamlit as st
-import pandas as pd
+import pd as pd
 import io
 import streamlit.components.v1 as components
 
 # --- 1. CONFIGURATION ET STYLE ---
 st.set_page_config(page_title="BIPÉA Analyzer Pro", page_icon="🍞", layout="wide")
 
+# CSS CORRIGÉ : On force la couleur du texte des métriques en noir/anthracite
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #ececf1; }
-    div[data-testid="stTextarea"] textarea { font-size: 1.15rem !important; font-family: 'Inter', sans-serif; border-radius: 12px; border: 1px solid #d1d1d6; }
-    .stMetric label { font-weight: 700 !important; color: #4b5563 !important; }
+    /* Style des cartes blanches */
+    [data-testid="stMetric"] {
+        background-color: #ffffff !important;
+        padding: 20px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+        border: 1px solid #ececf1 !important;
+    }
+    /* Forcer la couleur du label (titre) */
+    [data-testid="stMetricLabel"] {
+        color: #4b5563 !important;
+        font-weight: 700 !important;
+    }
+    /* Forcer la couleur de la valeur (chiffre) */
+    [data-testid="stMetricValue"] {
+        color: #1f2937 !important;
+    }
+    div[data-testid="stTextarea"] textarea { 
+        font-size: 1.15rem !important; 
+        font-family: 'Inter', sans-serif; 
+        border-radius: 12px; 
+        border: 1px solid #d1d1d6; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -24,7 +45,7 @@ tr = {
         "l_good": "bon lissage", "l_fast": "lissage un peu rapide", "l_slow": "lissage un peu lent",
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
         "same": "gardant le même profil tout au long du processus", "rel": "et relâchante après détente",
-        "t_good": "Bonne tenue aux deux enfournements.", "t_miss": "manque de tenue", "t_miss_imp": "manque important de tenue",
+        "t_good": "Bonne tenue aux deux enfournements.", "t_miss": "en manque de tenue", "t_miss_imp": "en manque important de tenue",
         "t_1": "au premier enfournement", "t_2": "au second",
         "a_very": "Très bel aspect", "a_good": "Bel aspect", "a_med": "Assez bel aspect", "a_cor": "Aspect correct", "a_poor": "Aspect médiocre",
         "with": "avec", "sec": "de section", "dev": "de développement", "reg": "de régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
@@ -39,7 +60,7 @@ tr = {
         "l_good": "good smoothing", "l_fast": "slightly fast smoothing", "l_slow": "slightly slow smoothing",
         "p_fin": "At the end of mixing, dough was", "f_fac": "During shaping, dough was", "equi": "balanced",
         "same": "maintaining the same profile throughout the process", "rel": "and slackening after resting",
-        "t_good": "Good stability during both bakes.", "t_miss": "lack of stability", "t_miss_imp": "significant lack of stability",
+        "t_good": "Good stability during both bakes.", "t_miss": "lacking stability", "t_miss_imp": "significantly lacking stability",
         "t_1": "at the first bake", "t_2": "at the second",
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "section", "dev": "development", "reg": "regularity", "grigne": "of the scoring", "dec": "a tearing of the scoring",
@@ -54,7 +75,7 @@ tr = {
         "l_good": "buen alisado", "l_fast": "alisado un poco rápido", "l_slow": "alisado un poco lento",
         "p_fin": "Al final del amasado, la masa estaba", "f_fac": "Durante el formado, la masa estaba", "equi": "equilibrada",
         "same": "manteniendo el mismo perfil durante todo el proceso", "rel": "y relajándose tras el reposo",
-        "t_good": "Buena estabilidad en ambas hornadas.", "t_miss": "falta de estabilidad", "t_miss_imp": "falta importante de estabilidad",
+        "t_good": "Buena estabilidad en ambas hornadas.", "t_miss": "en falta de estabilidad", "t_miss_imp": "en falta importante de estabilidad",
         "t_1": "en la primera hornada", "t_2": "en la segunda",
         "a_very": "Muy buen aspecto", "a_good": "Buen aspecto", "a_med": "Bastante buen aspecto", "a_cor": "Aspecto correcto", "a_poor": "Aspecto mediocre",
         "with": "con", "sec": "de sección", "dev": "de desarrollo", "reg": "de regularidad", "grigne": "del corte", "dec": "un desgarro del corte",
@@ -94,14 +115,14 @@ if uploaded_file:
         def d_def(s):
             return {7: t["exc"], 4: t["exc_imp"], -7: t["manq"], -4: t["manq_imp"]}.get(s, "")
 
-        # Données (conversion explicite pour affichage)
+        # Données
         hydra = float(df.iloc[30, 1])
         n_pate = float(df.iloc[30, 5])
         n_asp = float(df.iloc[33, 5])
         vol = float(df.iloc[33, 1])
         n_tot = float(df.iloc[35, 5])
 
-        # Affichage des cartes avec valeurs
+        # Affichage des cartes (Correction couleur texte noir)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(t["m_tot"], f"{n_tot:.1f}/100")
         m2.metric(t["m_pate"], f"{n_pate:.1f}/20")
@@ -109,7 +130,7 @@ if uploaded_file:
         m4.metric(t["m_vol"], f"{int(vol)} cm³")
         st.write("")
 
-        # Paramètres
+        # Paramètres techniques
         lis = ex_l("Lissage")
         cp, conp, extp, elap, relp = ex_l("Collant"), ex_l("Consistance"), ex_l("Extensibilité"), ex_l("Elasticité"), ex_l("Relâchement")
         cf, conf, extf, elaf = ex_s(20), ex_s(19), ex_s(21), ex_s(23)
@@ -145,7 +166,13 @@ if uploaded_file:
         else: 
             ten_txt = f" {d_ten(t1).capitalize()} {t['t_1']} {t['and']} {d_ten(t2)} {t['t_2']}."
 
-        a_txt = t["a_very"] if n_asp > 65 else t["a_good"] if n_asp > 60 else t["a_med"] if n_asp > 50 else t["a_cor"] if n_asp > 30 else t["a_poor"]
+        # Aspect (Application de ta méthode de notation personnalisée)
+        if n_asp >= 65: a_base = t["a_very"]
+        elif n_asp >= 60: a_base = t["a_good"]
+        elif n_asp >= 50: a_base = t["a_med"]
+        elif n_asp >= 30: a_base = t["a_cor"]
+        else: a_base = t["a_poor"]
+        
         s_asp = []
         if sec_v != 10: s_asp.append(f"{d_def(sec_v)} {t['sec']}")
         g_l = []
@@ -154,7 +181,7 @@ if uploaded_file:
         if g_l: s_asp.append(f"{f_lst(g_l)} {t['grigne']}")
         if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        final_asp = a_txt
+        final_asp = a_base
         if s_asp: final_asp += f" {t['with']} " + f_lst(s_asp)
         col_txt = f"{d_def(col_v).capitalize()} {t['col']}." if col_v != 10 else ""
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
