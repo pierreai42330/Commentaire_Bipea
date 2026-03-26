@@ -6,7 +6,6 @@ import streamlit.components.v1 as components
 # --- 1. CONFIGURATION ET STYLE ---
 st.set_page_config(page_title="BIPÉA Analyzer Pro", page_icon="🍞", layout="wide")
 
-# CSS pour un look épuré et professionnel
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -30,7 +29,7 @@ tr = {
         "a_very": "Très bel aspect", "a_good": "Bel aspect", "a_med": "Assez bel aspect", "a_cor": "Aspect correct", "a_poor": "Aspect médiocre",
         "with": "avec", "sec": "de section", "dev": "de développement", "reg": "de régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "de coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
-        "exc": "excès", "exc_imp": "excès important", "manq": "manque", "manq_imp": "manque important",
+        "exc": "en excès", "exc_imp": "en excès important", "manq": "en manque", "manq_imp": "en manque important",
         "collant": "collante", "collant_imp": "très collante", "cons": "de consistance", "ext": "d'extensibilité", "ela": "d'élasticité",
         "and": "et", "copy_btn": "📋 Copier le commentaire", "copy_ok": "Copié !",
         "m_tot": "Note Totale", "m_pate": "Note Pâte", "m_asp": "Note Aspect", "m_vol": "Valeur Volume"
@@ -45,7 +44,7 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "section", "dev": "development", "reg": "regularity", "grigne": "of the scoring", "dec": "a tearing of the scoring",
         "col": "crust coloring", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "exc": "excess", "exc_imp": "significant excess", "manq": "lack", "manq_imp": "significant lack",
+        "exc": "in excess", "exc_imp": "in significant excess", "manq": "lacking", "manq_imp": "significantly lacking",
         "collant": "sticky", "collant_imp": "very sticky", "cons": "consistency", "ext": "extensibility", "ela": "elasticity",
         "and": "and", "copy_btn": "📋 Copy Comment", "copy_ok": "Copied!",
         "m_tot": "Total Score", "m_pate": "Dough Score", "m_asp": "Aspect Score", "m_vol": "Volume Value"
@@ -60,7 +59,7 @@ tr = {
         "a_very": "Muy buen aspecto", "a_good": "Buen aspecto", "a_med": "Bastante buen aspecto", "a_cor": "Aspecto correcto", "a_poor": "Aspecto mediocre",
         "with": "con", "sec": "de sección", "dev": "de desarrollo", "reg": "de regularidad", "grigne": "del corte", "dec": "un desgarro del corte",
         "col": "de coloración de la corteza", "v_very": "Muy buen volumen", "v_good": "Buen volumen", "v_sat": "Volumen satisfactorio",
-        "exc": "exceso", "exc_imp": "exceso importante", "manq": "falta", "manq_imp": "falta importante",
+        "exc": "en exceso", "exc_imp": "en exceso importante", "manq": "en falta", "manq_imp": "en falta importante",
         "collant": "pegajosa", "collant_imp": "muy pegajosa", "cons": "de consistencia", "ext": "de extensibilidad", "ela": "de elasticidad",
         "and": "y", "copy_btn": "📋 Copiar comentario", "copy_ok": "¡Copiado!",
         "m_tot": "Nota Total", "m_pate": "Nota Masa", "m_asp": "Nota Aspecto", "m_vol": "Valor Volumen"
@@ -73,7 +72,6 @@ st.sidebar.header("Analyse")
 type_p = st.sidebar.selectbox("Type de produit", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
 uploaded_file = st.sidebar.file_uploader("📥 Charger l'Excel BIPÉA", type="xlsx")
 
-# Titre principal
 st.title("🍞 BIPÉA Analyzer Pro")
 st.markdown("---")
 
@@ -81,7 +79,6 @@ if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, header=None)
         
-        # Extraction des scores
         c_scores = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         def ex_s(idx):
             for col, sc in c_scores.items():
@@ -97,23 +94,29 @@ if uploaded_file:
         def d_def(s):
             return {7: t["exc"], 4: t["exc_imp"], -7: t["manq"], -4: t["manq_imp"]}.get(s, "")
 
-        # Data
-        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30,1]), float(df.iloc[30,5]), float(df.iloc[33,5]), float(df.iloc[33,1]), float(df.iloc[35,5])
+        # Données (conversion explicite pour affichage)
+        hydra = float(df.iloc[30, 1])
+        n_pate = float(df.iloc[30, 5])
+        n_asp = float(df.iloc[33, 5])
+        vol = float(df.iloc[33, 1])
+        n_tot = float(df.iloc[35, 5])
+
+        # Affichage des cartes avec valeurs
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(t["m_tot"], f"{n_tot:.1f}/100")
+        m2.metric(t["m_pate"], f"{n_pate:.1f}/20")
+        m3.metric(t["m_asp"], f"{n_asp:.1f}/20")
+        m4.metric(t["m_vol"], f"{int(vol)} cm³")
+        st.write("")
+
+        # Paramètres
         lis = ex_l("Lissage")
         cp, conp, extp, elap, relp = ex_l("Collant"), ex_l("Consistance"), ex_l("Extensibilité"), ex_l("Elasticité"), ex_l("Relâchement")
         cf, conf, extf, elaf = ex_s(20), ex_s(19), ex_s(21), ex_s(23)
         t1, t2 = ex_s(30), ex_s(31)
         sec_v, col_v, dev_v, reg_v, dec_v = ex_s(33), ex_s(34), ex_s(37), ex_s(38), ex_s(39)
 
-        # AFFICHAGE DES KPI (Seulement si fichier chargé)
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric(t["m_tot"], f"{n_tot}/100")
-        m2.metric(t["m_pate"], f"{n_pate}/20")
-        m3.metric(t["m_asp"], f"{n_asp}/20")
-        m4.metric(t["m_vol"], f"{int(vol)} cm³")
-        st.write("")
-
-        # RÉDACTION
+        # Rédaction
         h_lim = 63 if "force" in type_p.lower() else 61
         h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
@@ -142,7 +145,6 @@ if uploaded_file:
         else: 
             ten_txt = f" {d_ten(t1).capitalize()} {t['t_1']} {t['and']} {d_ten(t2)} {t['t_2']}."
 
-        # Aspect
         a_txt = t["a_very"] if n_asp > 65 else t["a_good"] if n_asp > 60 else t["a_med"] if n_asp > 50 else t["a_cor"] if n_asp > 30 else t["a_poor"]
         s_asp = []
         if sec_v != 10: s_asp.append(f"{d_def(sec_v)} {t['sec']}")
@@ -159,11 +161,9 @@ if uploaded_file:
 
         res_final = f"{h_txt}, {l_txt}. {comp_txt}{ten_txt}\n\n{final_asp}. {col_txt} {v_txt}."
 
-        # AFFICHAGE DU RÉSULTAT
         st.subheader("📝 Commentaire Final")
         st.text_area("", value=res_final, height=220, key="report_area")
 
-        # BOUTON COPIE JAVASCRIPT
         copy_js = f"""
         <div style="margin-top: 10px;">
             <button onclick="copyToClipboard()" style="background-color: #007bff; color: white; border: none; padding: 14px 28px; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; box-shadow: 0 4px 6px rgba(0,123,255,0.2);">
@@ -184,5 +184,4 @@ if uploaded_file:
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
 else:
-    # État vide sans carrés blancs
-    st.info("👋 Bonjour Marion. Veuillez charger un fichier Excel (.xlsx) dans le menu de gauche pour générer le rapport.")
+    st.info("👋 Bonjour Marion. Veuillez charger un fichier Excel (.xlsx) pour générer le rapport.")
