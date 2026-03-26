@@ -27,8 +27,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. TRADUCTION ET VOCABULAIRE ---
-lang = st.sidebar.selectbox("🌐 Langue", ["Français", "English", "Español"])
-
 tr = {
     "Français": {
         "h_good": "Bonne hydratation", "h_med": "Assez bonne hydratation", "h_sat": "Hydratation satisfaisante",
@@ -36,8 +34,13 @@ tr = {
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
         "same": "gardant le même profil tout au long du processus",
         "t_good": "Bonne tenue aux deux enfournements", "t_miss": "manque de tenue", "t_1": "au premier enfournement", "t_2": "au second",
-        "a_pains": "aspect des pains",
-        "a_very": "Très bel", "a_good": "Bel", "a_med": "Assez bel", "a_cor": "Correct", "a_poor": "Médiocre",
+        # --- NOUVELLES PHRASES ASPECT ---
+        "a_very": "Très bel aspect des pains",
+        "a_good": "Bel aspect des pains",
+        "a_med": "Assez bel aspect des pains",
+        "a_cor": "Aspect correct des pains",
+        "a_poor": "Aspect médiocre des pains",
+        # -------------------------------
         "with": "avec", "sec": "de section", "dev": "de développement", "reg": "de régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
         "exc_p": "en excès", "manq_p": "en manque", "exc_a": "un excès", "manq_a": "un manque",
@@ -45,7 +48,7 @@ tr = {
         "and": "et", "copy_btn": "📋 Copier le commentaire", "copy_ok": "Copié !"
     }
 }
-t = tr.get(lang, tr["Français"])
+t = tr["Français"]
 
 # --- 3. LOGIQUE D'EXTRACTION ---
 def get_score(df, idx, col_map):
@@ -89,14 +92,15 @@ if uploaded_file:
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
         sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
 
-        # Construction du texte
+        # 1. PHRASE HYDRATATION ET LISSAGE
         h_lim = 63 if "force" in type_p.lower() else 61
         h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
 
+        # 2. PHRASE PATE
         def fmt_p(c, co, ex, el):
             res = []
-            if c in [7,4]: res.append(t["collant"] if c==7 else t["collant_imp"])
+            if c in [7,4]: res.append(t["collant"] if c==7 else "très collante")
             if co != 10: res.append(f"{t['manq_p'] if co<0 else t['exc_p']} {t['cons']}")
             if ex != 10: res.append(f"{t['manq_p'] if ex<0 else t['exc_p']} {t['ext']}")
             if el != 10: res.append(f"{t['manq_p'] if el<0 else t['exc_p']} {t['ela']}")
@@ -107,15 +111,19 @@ if uploaded_file:
         pl, fl = fmt_p(cp, conp, extp, elap), fmt_p(cf, conf, extf, elaf)
         pate_txt = f"{t['p_fin']} {join_l(pl)}. {t['f_fac']} {join_l(fl)}." if pl != fl else f"{t['p_fin']} {join_l(pl)} {t['same']}."
 
-        # Tenue (Correction : Bonne tenue au 1er et manque au 2nd)
+        # 3. PHRASE TENUE
         if t1==10 and t2==10: ten_txt = f" {t['t_good']}."
         else:
             txt_t1 = "Bonne tenue" if t1==10 else f"{t['manq_p'].capitalize()} de tenue"
             txt_t2 = "bonne tenue" if t2==10 else f"{t['manq_p']} de tenue"
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {txt_t2} {t['t_2']}."
 
-        # Aspect (Correction : Assez bel aspect des pains avec un manque...)
-        a_qual = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
+        # 4. PHRASE ASPECT (CORRIGÉE)
+        if n_asp >= 65: a_base = t["a_very"]
+        elif n_asp >= 60: a_base = t["a_good"]
+        elif n_asp >= 50: a_base = t["a_med"]
+        elif n_asp >= 30: a_base = t["a_cor"]
+        else: a_base = t["a_poor"]
         
         s_asp = []
         if sec_v != 10: s_asp.append(f"{t['manq_a'] if sec_v<0 else t['exc_a']} {t['sec']}")
@@ -125,9 +133,10 @@ if uploaded_file:
         if g_l: s_asp.append(f"{join_l(g_l)} {t['grigne']}")
         if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        final_asp = f"{a_qual} {t['a_pains']}"
+        final_asp = a_base
         if s_asp: final_asp += f" {t['with']} " + join_l(s_asp)
         
+        # 5. COLORATION ET VOLUME
         col_txt = f"{(t['manq_a'] if col_v<0 else t['exc_a']).capitalize()} {t['col']}." if col_v != 10 else ""
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
 
