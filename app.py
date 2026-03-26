@@ -85,7 +85,7 @@ if uploaded_file:
         m3.metric("Note Aspect", f"{n_asp:.1f}/70")
         m4.metric("Valeur Volume", f"{int(vol)} cm³")
 
-        # Extraction
+        # Extraction des paramètres
         lis = find_label_score(df, "Lissage", c_map)
         cp, conp, extp, elap = find_label_score(df, "Collant", c_map), find_label_score(df, "Consistance", c_map), find_label_score(df, "Extensibilité", c_map), find_label_score(df, "Elasticité", c_map)
         cf, conf, extf, elaf = get_score(df, 20, c_map), get_score(df, 19, c_map), get_score(df, 21, c_map), get_score(df, 23, c_map)
@@ -97,7 +97,7 @@ if uploaded_file:
         h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
 
-        # 2. Pâte (Correction : "Pâte..." si profil identique)
+        # 2. Pâte (Logique de comparaison stricte)
         def fmt_p(c, co, ex, el):
             res = []
             if c == 7: res.append(t["collant"])
@@ -111,8 +111,8 @@ if uploaded_file:
 
         pl, fl = fmt_p(cp, conp, extp, elap), fmt_p(cf, conf, extf, elaf)
         
+        # Comparaison de TOUS les paramètres (y compris le collant)
         if pl == fl:
-            # On retire "En fin de pétrissage" pour un début direct
             pate_txt = f"Pâte {join_l(pl)} {t['same']}."
         else:
             pate_txt = f"{t['p_fin']} {join_l(pl)}. {t['f_fac']} {join_l(fl)}."
@@ -124,7 +124,7 @@ if uploaded_file:
             txt_t2 = "bonne tenue" if t2==10 else f"{get_intensity(t2, 'pate')} de tenue"
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {txt_t2} {t['t_2']}."
 
-        # 4. Aspect (Regroupement grigne)
+        # 4. Aspect (Regroupement coup de lame)
         a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
