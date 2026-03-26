@@ -3,156 +3,172 @@ import pandas as pd
 import io
 import streamlit.components.v1 as components
 
-# Configuration de la page
-st.set_page_config(page_title="Commentaire Bipéa", page_icon="🍞")
+# 1. CONFIGURATION DE LA PAGE
+st.set_page_config(page_title="Générateur BIPÉA Marion", page_icon="🍞")
 
-st.title("🍞 Générateur de Commentaires")
-st.write("Analyse automatique selon les protocoles BIPÉA.")
+st.title("🍞 Générateur de Commentaires Marion")
 
-# 1. Barre latérale de configuration
+# 2. BARRE LATÉRALE (LANGUE & TYPE)
 st.sidebar.header("Configuration")
-type_p = st.sidebar.selectbox(
-    "Type de produit :",
-    ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"]
-)
+lang = st.sidebar.selectbox("Langue / Language / Idioma :", ["Français", "English", "Español"])
 
-# 2. Zone de chargement du fichier
-uploaded_file = st.file_uploader("Charger le fichier Excel BIPÉA (.xlsx)", type="xlsx")
+# Libellés selon la langue
+label_type = "Type de produit" if lang == "Français" else "Product Type" if lang == "English" else "Tipo de producto"
+type_p = st.sidebar.selectbox(label_type, ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
+
+# 3. DICTIONNAIRE DE TRADUCTION TECHNIQUE
+tr = {
+    "Français": {
+        "h_good": "Bonne hydratation", "h_med": "Assez bonne hydratation", "h_sat": "Hydratation satisfaisante",
+        "l_good": "bon lissage", "l_fast": "lissage un peu rapide", "l_slow": "lissage un peu lent",
+        "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
+        "same": "gardant le même profil tout au long du processus", "rel": "et relâchante après détente",
+        "t_good": "Bonne tenue aux deux enfournements.", "t_miss": "manque de tenue", "t_miss_imp": "manque important de tenue",
+        "t_1": "au premier enfournement", "t_2": "au second",
+        "a_very": "Très bel aspect du pain", "a_good": "Bel aspect du pain", "a_med": "Assez bel aspect du pain", "a_cor": "Aspect correct du pain", "a_poor": "Aspect médiocre du pain",
+        "with": "avec", "sec": "de section", "dev": "de développement", "reg": "de régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
+        "col": "de coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
+        "exc": "excès", "exc_imp": "excès important", "manq": "manque", "manq_imp": "manque important",
+        "collant": "collante", "collant_imp": "très collante", "cons": "de consistance", "ext": "d'extensibilité", "ela": "d'élasticité",
+        "and": "et", "copy_btn": "📋 Copier le commentaire", "copy_ok": "Copié !"
+    },
+    "English": {
+        "h_good": "Good hydration", "h_med": "Fairly good hydration", "h_sat": "Satisfactory hydration",
+        "l_good": "good smoothing", "l_fast": "slightly fast smoothing", "l_slow": "slightly slow smoothing",
+        "p_fin": "At the end of mixing, dough was", "f_fac": "During shaping, dough was", "equi": "balanced",
+        "same": "maintaining the same profile throughout the process", "rel": "and slackening after resting",
+        "t_good": "Good stability during both bakes.", "t_miss": "lack of stability", "t_miss_imp": "significant lack of stability",
+        "t_1": "at the first bake", "t_2": "at the second",
+        "a_very": "Very beautiful bread appearance", "a_good": "Beautiful bread appearance", "a_med": "Fairly beautiful bread appearance", "a_cor": "Correct bread appearance", "a_poor": "Poor bread appearance",
+        "with": "with", "sec": "section", "dev": "development", "reg": "regularity", "grigne": "of the scoring", "dec": "a tearing of the scoring",
+        "col": "crust coloring", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
+        "exc": "excess", "exc_imp": "significant excess", "manq": "lack", "manq_imp": "significant lack",
+        "collant": "sticky", "collant_imp": "very sticky", "cons": "consistency", "ext": "extensibility", "ela": "elasticity",
+        "and": "and", "copy_btn": "📋 Copy Comment", "copy_ok": "Copied!"
+    },
+    "Español": {
+        "h_good": "Buena hidratación", "h_med": "Bastante buena hidratación", "h_sat": "Hidratación satisfactoria",
+        "l_good": "buen alisado", "l_fast": "alisado un poco rápido", "l_slow": "alisado un peu lento",
+        "p_fin": "Al final del amasado, la masa estaba", "f_fac": "Durante el formado, la masa estaba", "equi": "equilibrada",
+        "same": "manteniendo el mismo perfil durante todo el proceso", "rel": "y relajándose tras el reposo",
+        "t_good": "Buena estabilidad en ambas hornadas.", "t_miss": "falta de estabilidad", "t_miss_imp": "falta importante de estabilidad",
+        "t_1": "en la primera hornada", "t_2": "en la segunda",
+        "a_very": "Muy buen aspecto del pan", "a_good": "Buen aspecto del pan", "a_med": "Bastante buen aspecto del pan", "a_cor": "Aspecto correcto del pan", "a_poor": "Aspecto mediocre del pan",
+        "with": "con", "sec": "de sección", "dev": "de desarrollo", "reg": "de regularidad", "grigne": "del corte", "dec": "un desgarro del corte",
+        "col": "de coloración de la corteza", "v_very": "Muy buen volumen", "v_good": "Buen volumen", "v_sat": "Volumen satisfactorio",
+        "exc": "exceso", "exc_imp": "exceso importante", "manq": "falta", "manq_imp": "falta importante",
+        "collant": "pegajosa", "collant_imp": "muy pegajosa", "cons": "de consistance", "ext": "de extensibilidad", "ela": "de elasticidad",
+        "and": "y", "copy_btn": "📋 Copiar comentario", "copy_ok": "¡Copiado!"
+    }
+}
+
+t = tr[lang]
+
+# 4. CHARGEMENT EXCEL
+uploaded_file = st.file_uploader("Fichier Excel BIPÉA (.xlsx)", type="xlsx")
 
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, header=None)
 
-        # --- LOGIQUE D'EXTRACTION ---
-        colonnes_scores = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
-
-        def ex_score(idx):
-            for col, sc in colonnes_scores.items():
+        # Logique d'extraction des scores
+        c_scores = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
+        def ex_s(idx):
+            for col, sc in c_scores.items():
                 try:
                     if str(df.iloc[idx, col]).strip().upper() == 'X': return sc
                 except: continue
             return 10
-
-        def ex_label(label):
+        def ex_l(label):
             for i in range(len(df)):
                 txt = [str(v).strip().lower() for v in df.iloc[i].values]
-                if any(label.lower() in s for s in txt): return ex_score(i)
+                if any(label.lower() in s for s in txt): return ex_s(i)
             return 10
+        def d_def(s):
+            return {7: t["exc"], 4: t["exc_imp"], -7: t["manq"], -4: t["manq_imp"]}.get(s, "")
 
-        def desc_defaut(s):
-            return {7: "excès", 4: "excès important", 1: "excès très important", 
-                    -7: "manque", -4: "manque important", -1: "manque très important"}.get(s, "")
-
-        # --- DONNÉES NUMÉRIQUES ---
+        # Extraction des données clés
         hydra = float(df.iloc[30, 1])      
         note_pate = float(df.iloc[30, 5])   
         note_aspect = float(df.iloc[33, 5]) 
-        volume_val = float(df.iloc[33, 1])  
-        note_totale = float(df.iloc[35, 5]) 
+        vol = float(df.iloc[33, 1])  
+        note_tot = float(df.iloc[35, 5]) 
 
-        # --- PARAMÈTRES TECHNIQUES ---
-        lis = ex_label("Lissage")
-        # Pétrissage (P)
-        col_p, con_p, ext_p, ela_p, rel_p = ex_label("Collant de la pâte"), ex_label("Consistance"), ex_label("Extensibilité"), ex_label("Elasticité"), ex_label("Relâchement")
-        # Façonnage (F) - Indices de colonnes fixes pour le façonnage
-        col_f, con_f, ext_f, ela_f = ex_score(20), ex_score(19), ex_score(21), ex_score(23)
-        # Pain
-        t1, t2 = ex_score(30), ex_score(31)
-        sec_v, col_v = ex_score(33), ex_score(34) 
-        dev_v, reg_v, dec_v = ex_score(37), ex_score(38), ex_score(39) 
+        # Paramètres
+        lis = ex_l("Lissage")
+        cp, conp, extp, elap, relp = ex_l("Collant"), ex_l("Consistance"), ex_l("Extensibilité"), ex_l("Elasticité"), ex_l("Relâchement")
+        cf, conf, extf, elaf = ex_s(20), ex_s(19), ex_s(21), ex_s(23)
+        t1, t2 = ex_s(30), ex_s(31)
+        sec_v, col_v, dev_v, reg_v, dec_v = ex_s(33), ex_s(34), ex_s(37), ex_s(38), ex_s(39)
 
-        # --- RÉDACTION ---
+        # 5. RÉDACTION DU COMMENTAIRE
+        h_lim = 63 if "force" in type_p.lower() else 61
+        h_txt = t["h_good"] if hydra >= h_lim else t["h_med"] if hydra >= (h_lim-2) else t["h_sat"]
+        l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
+
+        def get_d(c, co, ex, el):
+            res = []
+            if c in [7,4]: res.append(t["collant"] if c==7 else t["collant_imp"])
+            if co != 10: res.append(f"{d_def(co)} {t['cons']}")
+            if ex != 10: res.append(f"{d_def(ex)} {t['ext']}")
+            if el != 10: res.append(f"{d_def(el)} {t['ela']}")
+            return res
+
+        def f_lst(lst):
+            return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
+
+        pl, fl = get_d(cp, conp, extp, elap), get_d(cf, conf, extf, elaf)
+        rel_m = f" {t['rel']}" if relp == 7 else ""
         
-        # 1. Hydratation & Lissage
-        h_lim = 63 if type_p == "Blé de force" else 61
-        h_txt = "Bonne hydratation" if hydra >= h_lim else "Assez bonne hydratation" if hydra >= (h_lim-2) else "Hydratation satisfaisante"
-        l_txt = {10: "bon lissage", 7: "lissage un peu rapide", -7: "lissage un peu lent"}.get(lis, "lissage correct")
-
-        # Fonctions de mise en forme
-        def format_list(lst):
-            return ", ".join(lst[:-1]) + " et " + lst[-1] if len(lst) > 1 else (lst[0] if lst else "équilibrée")
-
-        def get_details(c, co, ex, el):
-            d = []
-            if c in [7, 4]: d.append("collante" if c==7 else "très collante")
-            if co != 10: d.append(f"en {desc_defaut(co)} de consistance")
-            if ex != 10: d.append(f"en {desc_defaut(ex)} d'extensibilité")
-            if el != 10: d.append(f"en {desc_defaut(el)} d'élasticité")
-            return d
-
-        # 2. Pâte (Pétrissage & Façonnage)
-        p_list = get_details(col_p, con_p, ext_p, ela_p)
-        f_list = get_details(col_f, con_f, ext_f, ela_f)
-        rel_msg = " et relâchante après détente" if rel_p == 7 else ""
-        
-        # Vérification si le profil est identique
-        if (ext_f == ext_p and ela_f == ela_p and col_f == col_p and con_f == con_p):
-            p_str = format_list(p_list)
-            comportement_txt = f"Pâte {p_str}{rel_msg} gardant le même profil tout au long du processus."
+        if (extf==extp and elaf==elap and cf==cp and conf==conp):
+            comp_txt = f"{t['p_fin']} {f_lst(pl)}{rel_m} {t['same']}."
         else:
-            p_str = format_list(p_list)
-            f_str = format_list(f_list)
-            comportement_txt = f"En fin de pétrissage, pâte {p_str}. Au façonnage, pâte {f_str}{rel_msg}."
+            comp_txt = f"{t['p_fin']} {f_lst(pl)}. {t['f_fac']} {f_lst(fl)}{rel_m}."
 
-        # Tenue
-        def desc_t(score): return {-7: "manque de tenue", -4: "manque important de tenue"}.get(score, "bonne tenue")
-        t_txt = f" {desc_t(t1).capitalize()} au premier enfournement et {desc_t(t2)} au second." if (t1 != 10 or t2 != 10) else " Bonne tenue aux deux enfournements."
+        def d_ten(s): return {10: t["t_good"], -7: t["t_miss"], -4: t["t_miss_imp"]}.get(s, t["t_miss"])
+        if t1==10 and t2==10: ten_txt = f" {t['t_good']}"
+        else: ten_txt = f" {d_ten(t1).capitalize()} {t['t_1']} {t['and']} {d_ten(t2)} {t['t_2']}."
 
-        # 3. Aspect & Grigne
-        if note_aspect > 65: a_base = "Très bel aspect du pain"
-        elif note_aspect > 60: a_base = "Bel aspect du pain"
-        elif note_aspect > 50: a_base = "Assez bel aspect du pain"
-        elif note_aspect > 30: a_base = "Aspect correct du pain"
-        else: a_base = "Aspect médiocre du pain"
-
-        suite_aspect = []
-        if sec_v != 10: suite_aspect.append(f"un {desc_defaut(sec_v)} de section")
-        gr_el = []
-        if dev_v != 10: gr_el.append(f"{desc_defaut(dev_v)} de développement")
-        if reg_v != 10: gr_el.append(f"{desc_defaut(reg_v)} de régularité")
-        if gr_el: suite_aspect.append(f"un {' et '.join(gr_el)} du coup de lame")
-        if dec_v in [7, 4]: suite_aspect.append("un déchirement du coup de lame")
+        # Aspect
+        a_txt = t["a_very"] if note_aspect > 65 else t["a_good"] if note_aspect > 60 else t["a_med"] if note_aspect > 50 else t["a_cor"] if note_aspect > 30 else t["a_poor"]
+        s_asp = []
+        if sec_v != 10: s_asp.append(f"{d_def(sec_v)} {t['sec']}")
+        g_l = []
+        if dev_v != 10: g_l.append(f"{d_def(dev_v)} {t['dev']}")
+        if reg_v != 10: g_l.append(f"{d_def(reg_v)} {t['reg']}")
+        if g_l: s_asp.append(f"{f_lst(g_l)} {t['grigne']}")
+        if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        final_aspect = a_base
-        if suite_aspect:
-            final_aspect += " avec " + format_list(suite_aspect)
-        
-        # 4. Coloration (Phrase simplifiée à part)
-        color_txt = f"{desc_defaut(col_v).capitalize()} de coloration de la croûte." if col_v != 10 else ""
+        final_asp = a_txt
+        if s_asp: final_asp += f" {t['with']} " + f_lst(s_asp)
+        col_txt = f"{d_def(col_v).capitalize()} {t['col']}." if col_v != 10 else ""
+        v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
 
-        # 5. Volume
-        v_lib = "Très bon volume" if volume_val > 1850 else "Bon volume" if volume_val > 1650 else "Assez bon volume"
+        # Final String
+        res_final = f"{h_txt}, {l_txt}. {comp_txt}{ten_txt}\n\n{final_asp}. {col_txt} {v_txt}."
 
-        # --- CONSTRUCTION DU TEXTE FINAL ---
-        paragraphe_1 = f"{h_txt}, {l_txt}. {comportement_txt}{t_txt}"
-        paragraphe_2 = f"{final_aspect}. {color_txt} {v_lib}."
-        commentaire_complet = f"{paragraphe_1}\n\n{paragraphe_2}"
-
-        # --- AFFICHAGE ---
+        # 6. AFFICHAGE ET COPIE
         st.divider()
-        st.subheader("📝 Commentaire généré")
-        
-        # Zone de texte éditable
-        st.text_area("Résultat :", value=commentaire_complet, height=180, key="txt_area")
+        st.subheader("Résultat / Result / Resultado")
+        st.text_area("", value=res_final, height=200, key="output_text")
 
-        # BOUTON COPIER PERSONNALISÉ
+        # Bouton Bleu de Copie
         copy_js = f"""
-        <button onclick="copyText()" style="background-color: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%;">
-            📋 Copier le commentaire
+        <button onclick="copyToClipboard()" style="background-color: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%;">
+            {t['copy_btn']}
         </button>
         <script>
-        function copyText() {{
-            const text = `{commentaire_complet}`;
+        function copyToClipboard() {{
+            const text = `{res_final}`;
             navigator.clipboard.writeText(text).then(() => {{
-                alert("Commentaire copié dans le presse-papiers !");
+                alert("{t['copy_ok']}");
             }});
         }}
         </script>
         """
         components.html(copy_js, height=80)
-
-        # Infos chiffrées en bas
-        st.info(f"**Données :** Note Totale: **{note_totale}** | Pâte: **{note_pate}** | Aspect: **{note_aspect}** | Volume: **{volume_val}** | Hydra: **{hydra}%**")
+        
+        st.info(f"Notes: Total {note_tot} | Pâte {note_pate} | Aspect {note_aspect} | Vol {vol}")
 
     except Exception as e:
         st.error(f"Erreur d'analyse : {e}")
