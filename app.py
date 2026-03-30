@@ -61,16 +61,12 @@ def format_params_grouped(data_dict):
     groups = {}
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(t[k])
-    
     res = []
     ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"}
-    
     for score, labels in groups.items():
         prefix = ints.get(score, "")
-        # Correction d'élision (d')
         fmt = [f"d'{l}" if l[0] in "aeiouéè" else f"de {l}" for l in labels]
         clean_prefix = prefix.rsplit(' ', 1)[0] 
-        
         if len(fmt) > 1:
             l_str = f" {t['and']} ".join([", ".join(fmt[:-1]), fmt[-1]]) if len(fmt) > 2 else f" {t['and']} ".join(fmt)
             res.append(f"{clean_prefix} {l_str}")
@@ -81,7 +77,7 @@ def format_params_grouped(data_dict):
 def join_final(lst):
     return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
 
-# --- 4. INTERFACE STREAMLIT ---
+# --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
 uploaded_file = st.sidebar.file_uploader("📥 Charger l'Excel BIPÉA", type="xlsx")
 type_p = st.sidebar.selectbox("Type de farine", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
@@ -91,32 +87,19 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION DES NOTES (Sécurisée) ---
-        try:
-            hydra = float(df.iloc[30, 1])
-            n_pate = float(df.iloc[30, 5])
-            n_asp = float(df.iloc[33, 5])
-            vol = float(df.iloc[33, 1])
-            n_tot = float(df.iloc[35, 5])
-        except:
-            st.error("⚠️ Impossible de lire les notes dans le fichier. Vérifiez le format de l'Excel.")
-            st.stop()
+        # NOTES
+        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
 
-        # Affichage des 4 Compteurs (Notes)
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/300")
+        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
         m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
         m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
-        # --- ANALYSE TECHNIQUE ---
+        # ANALYSE PÂTE
         lis = find_label_score(df, "Lissage", c_map)
-        
-        # Pétrissage (Complet)
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
-        
-        # Façonnage (SANS consistance ni relâchement)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
@@ -131,20 +114,30 @@ if uploaded_file:
         pl, fl = build_pate_list(cp, p_data, rp, True), build_pate_list(cf, f_data, is_p=False)
         pate_txt = f"{t['p_direct']} {join_final(pl)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl)}. {t['f_fac']} {join_final(fl)}."
 
-        # --- TENUE & ASPECT ---
+        # --- LOGIQUE TENUE CORRIGÉE ---
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
-        sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
+        
+        def fmt_tenue(score):
+            if score == 10: return "bonne tenue"
+            if score == -7: return "un manque de tenue"
+            if score == -4: return "un manque important de tenue"
+            if score == 7: return "un excès de tenue"
+            if score == 4: return "un excès important de tenue"
+            return "tenue correcte"
 
+        if t1 == 10 and t2 == 10:
+            ten_txt = f" {t['t_good']}."
+        else:
+            txt_t1 = fmt_tenue(t1).capitalize()
+            txt_t2 = fmt_tenue(t2)
+            ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {txt_t2} {t['t_2']}."
+
+        # ASPECT
+        sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
         h_txt = t["h_good"] if hydra >= (63 if "force" in type_p.lower() else 61) else t["h_med"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
-        ten_txt = f" {t['t_good']}." if t1==10 and t2==10 else f" {('Bonne tenue' if t1==10 else 'Un manque de tenue')} {t['t_1']} {t['and']} {('bonne tenue' if t2==10 else 'un manque de tenue')} {t['t_2']}."
-
-        # Échelle Aspect Marion
-        if n_asp >= 65: a_base = t["a_very"]
-        elif n_asp >= 60: a_base = t["a_good"]
-        elif n_asp >= 50: a_base = t["a_med"]
-        elif n_asp >= 30: a_base = t["a_cor"]
-        else: a_base = t["a_poor"]
+        
+        a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
@@ -159,17 +152,10 @@ if uploaded_file:
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
-        # --- ASSEMBLAGE FINAL ---
         res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_final}. {col_txt} {v_txt}."
-        
         st.subheader("📝 Commentaire de panification")
         st.text_area("", value=res, height=260)
 
-        # Bouton Copie
-        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Commentaire copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
+        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
 
-    except Exception as e:
-        st.error(f"Une erreur est survenue : {e}")
-
-else:
-    st.info("👋 Bonjour Marion ! Veuillez charger un fichier Excel pour commencer l'analyse.")
+    except Exception as e: st.error(f"Erreur : {e}")
