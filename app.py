@@ -16,7 +16,6 @@ st.markdown("""
         border: 1px solid #ececf1 !important;
     }
     [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 1.1rem !important; }
-    [data-testid="stMetricValue"] { color: #1f2937 !important; }
     div[data-testid="stTextarea"] textarea { 
         font-size: 1.2rem !important; 
         border-radius: 12px; 
@@ -58,7 +57,7 @@ def find_label_score(df, label, col_map):
     return 10
 
 def format_params_grouped(data_dict):
-    """Regroupe les paramètres par score identique pour éviter les répétitions"""
+    """Regroupe par score et gère l'élision (d')"""
     groups = {}
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(t[k])
@@ -68,12 +67,17 @@ def format_params_grouped(data_dict):
     
     for score, labels in groups.items():
         prefix = ints.get(score, "")
-        fmt = [f"d'{l}" if l[0] in "aeiouéè" else l for l in labels]
+        # Logique d'élision : si le mot commence par une voyelle, on utilise d'
+        fmt = [f"d'{l}" if l[0] in "aeiouéè" else f"de {l}" for l in labels]
+        
+        # On retire le "de" final du préfixe car il est géré dans fmt
+        clean_prefix = prefix.rsplit(' ', 1)[0] 
+        
         if len(fmt) > 1:
             l_str = f" {t['and']} ".join([", ".join(fmt[:-1]), fmt[-1]]) if len(fmt) > 2 else f" {t['and']} ".join(fmt)
-            res.append(f"{prefix} {l_str}")
+            res.append(f"{clean_prefix} {l_str}")
         else:
-            res.append(f"{prefix} {labels[0]}")
+            res.append(f"{clean_prefix} {fmt[0]}")
     return res
 
 def join_final(lst):
@@ -89,10 +93,9 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION DES NOTES ET DONNÉES ---
+        # --- RÉCUPÉRATION DES NOTES ---
         hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
 
-        # Affichage des Metrics (Bien visibles)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
         m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
@@ -101,12 +104,8 @@ if uploaded_file:
 
         # --- ANALYSE PÂTE ---
         lis = find_label_score(df, "Lissage", c_map)
-        
-        # Pétrissage
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
-        
-        # Façonnage (Sans consistance ni relâchement)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
@@ -127,10 +126,8 @@ if uploaded_file:
 
         h_txt = t["h_good"] if hydra >= (63 if "force" in type_p.lower() else 61) else t["h_med"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
-        
         ten_txt = f" {t['t_good']}." if t1==10 and t2==10 else f" {('Bonne tenue' if t1==10 else 'Un manque de tenue')} {t['t_1']} {t['and']} {('bonne tenue' if t2==10 else 'un manque de tenue')} {t['t_2']}."
 
-        # Aspect (Seuil 65, 60, 50, 30)
         a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
@@ -148,14 +145,9 @@ if uploaded_file:
 
         # --- ASSEMBLAGE FINAL ---
         res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_final}. {col_txt} {v_txt}."
-        
         st.subheader("📝 Commentaire de panification")
         st.text_area("", value=res, height=260)
 
-        # Bouton Copier
-        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Commentaire copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
+        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
 
-    except Exception as e: st.error(f"Une erreur est survenue lors de la lecture de l'Excel : {e}")
-
-else:
-    st.info("Veuillez charger un fichier Excel dans la barre latérale pour commencer l'analyse.")
+    except Exception as e: st.error(f"Erreur : {e}")
