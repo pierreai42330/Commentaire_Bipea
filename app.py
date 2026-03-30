@@ -10,12 +10,13 @@ st.markdown("""
     .main { background-color: #f8f9fa; }
     [data-testid="stMetric"] {
         background-color: #ffffff !important;
-        padding: 20px !important;
+        padding: 15px !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
         border: 1px solid #ececf1 !important;
     }
-    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 1.1rem !important; }
+    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 1rem !important; }
+    [data-testid="stMetricValue"] { color: #1f2937 !important; font-size: 1.8rem !important; }
     div[data-testid="stTextarea"] textarea { 
         font-size: 1.2rem !important; 
         border-radius: 12px; 
@@ -57,7 +58,6 @@ def find_label_score(df, label, col_map):
     return 10
 
 def format_params_grouped(data_dict):
-    """Regroupe par score et gère l'élision (d')"""
     groups = {}
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(t[k])
@@ -67,10 +67,8 @@ def format_params_grouped(data_dict):
     
     for score, labels in groups.items():
         prefix = ints.get(score, "")
-        # Logique d'élision : si le mot commence par une voyelle, on utilise d'
+        # Correction d'élision (d')
         fmt = [f"d'{l}" if l[0] in "aeiouéè" else f"de {l}" for l in labels]
-        
-        # On retire le "de" final du préfixe car il est géré dans fmt
         clean_prefix = prefix.rsplit(' ', 1)[0] 
         
         if len(fmt) > 1:
@@ -83,7 +81,7 @@ def format_params_grouped(data_dict):
 def join_final(lst):
     return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
 
-# --- 4. INTERFACE ---
+# --- 4. INTERFACE STREAMLIT ---
 st.title("🍞 BIPÉA Analyzer Pro")
 uploaded_file = st.sidebar.file_uploader("📥 Charger l'Excel BIPÉA", type="xlsx")
 type_p = st.sidebar.selectbox("Type de farine", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
@@ -93,19 +91,32 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION DES NOTES ---
-        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
+        # --- RÉCUPÉRATION DES NOTES (Sécurisée) ---
+        try:
+            hydra = float(df.iloc[30, 1])
+            n_pate = float(df.iloc[30, 5])
+            n_asp = float(df.iloc[33, 5])
+            vol = float(df.iloc[33, 1])
+            n_tot = float(df.iloc[35, 5])
+        except:
+            st.error("⚠️ Impossible de lire les notes dans le fichier. Vérifiez le format de l'Excel.")
+            st.stop()
 
+        # Affichage des 4 Compteurs (Notes)
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
         m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
         m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
-        # --- ANALYSE PÂTE ---
+        # --- ANALYSE TECHNIQUE ---
         lis = find_label_score(df, "Lissage", c_map)
+        
+        # Pétrissage (Complet)
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
+        
+        # Façonnage (SANS consistance ni relâchement)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
@@ -128,7 +139,12 @@ if uploaded_file:
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
         ten_txt = f" {t['t_good']}." if t1==10 and t2==10 else f" {('Bonne tenue' if t1==10 else 'Un manque de tenue')} {t['t_1']} {t['and']} {('bonne tenue' if t2==10 else 'un manque de tenue')} {t['t_2']}."
 
-        a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
+        # Échelle Aspect Marion
+        if n_asp >= 65: a_base = t["a_very"]
+        elif n_asp >= 60: a_base = t["a_good"]
+        elif n_asp >= 50: a_base = t["a_med"]
+        elif n_asp >= 30: a_base = t["a_cor"]
+        else: a_base = t["a_poor"]
         
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
@@ -145,9 +161,15 @@ if uploaded_file:
 
         # --- ASSEMBLAGE FINAL ---
         res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_final}. {col_txt} {v_txt}."
+        
         st.subheader("📝 Commentaire de panification")
         st.text_area("", value=res, height=260)
 
-        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
+        # Bouton Copie
+        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Commentaire copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
 
-    except Exception as e: st.error(f"Erreur : {e}")
+    except Exception as e:
+        st.error(f"Une erreur est survenue : {e}")
+
+else:
+    st.info("👋 Bonjour Marion ! Veuillez charger un fichier Excel pour commencer l'analyse.")
