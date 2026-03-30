@@ -15,10 +15,12 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
         border: 1px solid #ececf1 !important;
     }
-    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; }
+    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 1.1rem !important; }
+    [data-testid="stMetricValue"] { color: #1f2937 !important; }
     div[data-testid="stTextarea"] textarea { 
-        font-size: 1.15rem !important; 
+        font-size: 1.2rem !important; 
         border-radius: 12px; 
+        border: 1px solid #d1d1d6; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -55,8 +57,8 @@ def find_label_score(df, label, col_map):
         if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
 
-def format_params(data_dict):
-    """Regroupe les paramètres par intensité (ex: en excès de consistance et d'extensibilité)"""
+def format_params_grouped(data_dict):
+    """Regroupe les paramètres par score identique pour éviter les répétitions"""
     groups = {}
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(t[k])
@@ -66,10 +68,7 @@ def format_params(data_dict):
     
     for score, labels in groups.items():
         prefix = ints.get(score, "")
-        fmt = []
-        for l in labels:
-            fmt.append(f"d'{l}" if l[0] in "aeiouéè" else l)
-        
+        fmt = [f"d'{l}" if l[0] in "aeiouéè" else l for l in labels]
         if len(fmt) > 1:
             l_str = f" {t['and']} ".join([", ".join(fmt[:-1]), fmt[-1]]) if len(fmt) > 2 else f" {t['and']} ".join(fmt)
             res.append(f"{prefix} {l_str}")
@@ -77,47 +76,50 @@ def format_params(data_dict):
             res.append(f"{prefix} {labels[0]}")
     return res
 
-def join_l(lst): return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
+def join_final(lst):
+    return f", ".join(lst[:-1]) + f" {t['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else t["equi"])
 
 # --- 4. INTERFACE ---
+st.title("🍞 BIPÉA Analyzer Pro")
 uploaded_file = st.sidebar.file_uploader("📥 Charger l'Excel BIPÉA", type="xlsx")
-type_p = st.sidebar.selectbox("Type", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
+type_p = st.sidebar.selectbox("Type de farine", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
 
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION DES NOTES ---
+        # --- RÉCUPÉRATION DES NOTES ET DONNÉES ---
         hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
 
+        # Affichage des Metrics (Bien visibles)
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Note Totale", f"{n_tot:.1f}/100")
-        m2.metric("Note Pâte", f"{n_pate:.1f}/100")
-        m3.metric("Note Aspect", f"{n_asp:.1f}/70")
-        m4.metric("Volume", f"{int(vol)} cm³")
+        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
+        m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
+        m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
+        m4.metric("VOLUME", f"{int(vol)} cm³")
 
-        # --- PARAMÈTRES PÂTE ---
+        # --- ANALYSE PÂTE ---
         lis = find_label_score(df, "Lissage", c_map)
         
-        # Pétrissage (Complet)
+        # Pétrissage
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
         
-        # Façonnage (SANS consistance ni relâchement)
+        # Façonnage (Sans consistance ni relâchement)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
-        def build_list(coll, data, rel=10, is_p=True):
+        def build_pate_list(coll, data, rel=10, is_p=True):
             l = []
             if coll == 7: l.append(t["collant"])
             elif coll == 4: l.append("très collante")
-            l.extend(format_params(data))
+            l.extend(format_params_grouped(data))
             if is_p and rel != 10: l.append(t["rel"])
             return l
 
-        pl, fl = build_list(cp, p_data, rp, True), build_list(cf, f_data, is_p=False)
-        pate_txt = f"{t['p_direct']} {join_l(pl)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_l(pl)}. {t['f_fac']} {join_l(fl)}."
+        pl, fl = build_pate_list(cp, p_data, rp, True), build_pate_list(cf, f_data, is_p=False)
+        pate_txt = f"{t['p_direct']} {join_final(pl)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl)}. {t['f_fac']} {join_final(fl)}."
 
         # --- TENUE & ASPECT ---
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
@@ -128,6 +130,7 @@ if uploaded_file:
         
         ten_txt = f" {t['t_good']}." if t1==10 and t2==10 else f" {('Bonne tenue' if t1==10 else 'Un manque de tenue')} {t['t_1']} {t['and']} {('bonne tenue' if t2==10 else 'un manque de tenue')} {t['t_2']}."
 
+        # Aspect (Seuil 65, 60, 50, 30)
         a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
         
         s_asp = []
@@ -139,15 +142,20 @@ if uploaded_file:
                 s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
         if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        asp_f = a_base + (f" {t['with']} " + join_l(s_asp) if s_asp else "")
+        asp_final = a_base + (f" {t['with']} " + join_final(s_asp) if s_asp else "")
         v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
-        # --- SORTIE ---
-        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
-        st.subheader("📝 Commentaire Final")
-        st.text_area("", value=res, height=250)
+        # --- ASSEMBLAGE FINAL ---
+        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_final}. {col_txt} {v_txt}."
+        
+        st.subheader("📝 Commentaire de panification")
+        st.text_area("", value=res, height=260)
 
-        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:bold;\">{t['copy_btn']}</button>", height=70)
+        # Bouton Copier
+        components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Commentaire copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1rem;\">{t['copy_btn']}</button>", height=80)
 
-    except Exception as e: st.error(f"Erreur : {e}")
+    except Exception as e: st.error(f"Une erreur est survenue lors de la lecture de l'Excel : {e}")
+
+else:
+    st.info("Veuillez charger un fichier Excel dans la barre latérale pour commencer l'analyse.")
