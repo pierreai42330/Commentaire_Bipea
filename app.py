@@ -104,7 +104,7 @@ if uploaded_file:
 
         # Affichage des 4 Compteurs (Notes)
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
+        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/300")
         m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
         m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
         m4.metric("VOLUME", f"{int(vol)} cm³")
