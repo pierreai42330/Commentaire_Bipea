@@ -50,7 +50,7 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "cons": "consistency", "ext": "extensibilité", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
+        "cons": "consistency", "ext": "extensibility", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
@@ -98,12 +98,12 @@ def join_final(lst, lang_dict):
 # --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
 
-# SELECTION DU TYPE D'ECHANTILLON AVANT TOUT
 st.sidebar.header("⚙️ Configuration")
+# Mise à jour des types selon tes précisions
 sample_type = st.sidebar.selectbox(
     "1. Type d'échantillon", 
-    ["Farine de base (BPMF)", "Farine de force", "Blé (BIPEA)", "Farine corrigée"],
-    help="Définit les échelles de notation pour l'hydratation et le volume."
+    ["Farine de base", "Blé de force", "Farine corrigée"],
+    help="Définit les échelles pour l'hydratation et le volume."
 )
 
 sel_lang = st.sidebar.selectbox("2. Langue / Language", ["Français", "English"])
@@ -157,20 +157,24 @@ if uploaded_file:
             txt_t1 = fmt_tenue(t1).capitalize()
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
-        # --- DYNAMIQUE DES SEUILS (Echelles Marion) ---
-        # Hydratation
-        h_limit = 63 if "force" in sample_type.lower() else 61 if "farine" in sample_type.lower() else 60
+        # --- SEUILS DYNAMIQUES ---
+        # Hydratation : 63% pour le blé de force, 61% pour le reste
+        h_limit = 63 if "force" in sample_type.lower() else 61
         h_txt = t["h_good"] if hydra >= h_limit else t["h_med"]
 
-        # Volume
+        # Volume : Les farines (base/corrigée) ont des cibles plus hautes que les blés
         v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
         v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
-        # Aspect (Seuils Marion)
-        a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
+        # --- ASPECT ---
+        # Utilisation de ton échelle de notation personnalisée
+        if n_asp >= 65: a_base = t["a_very"]
+        elif n_asp >= 60: a_base = t["a_good"]
+        elif n_asp >= 50: a_base = t["a_med"]
+        elif n_asp >= 30: a_base = t["a_cor"]
+        else: a_base = t["a_poor"]
 
-        # --- ASPECT DÉTAILS ---
         sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
@@ -194,4 +198,4 @@ if uploaded_file:
 
     except Exception as e: st.error(f"Erreur lors de l'analyse : {e}")
 else:
-    st.info("Sélectionnez le type de produit puis chargez votre fichier Excel pour générer le commentaire.")
+    st.info("Sélectionnez le type d'échantillon puis chargez le fichier Excel.")
