@@ -19,13 +19,13 @@ st.markdown("""
     }
     [data-testid="stMetric"] {
         background-color: #ffffff !important;
-        padding: 15px !important;
+        padding: 10px !important;
         border-radius: 12px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
         border: 1px solid #ececf1 !important;
     }
-    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 1rem !important; }
-    [data-testid="stMetricValue"] { color: #1f2937 !important; font-size: 1.8rem !important; }
+    [data-testid="stMetricLabel"] { color: #4b5563 !important; font-weight: 700 !important; font-size: 0.9rem !important; }
+    [data-testid="stMetricValue"] { color: #1f2937 !important; font-size: 1.5rem !important; }
     div[data-testid="stTextarea"] textarea { 
         font-size: 1.2rem !important; 
         border-radius: 12px; 
@@ -38,6 +38,7 @@ st.markdown("""
 tr = {
     "Français": {
         "header_warn": "⚠️ Ce commentaire est une base de travail. Veuillez relire les paramètres et modifier l'hydratation si nécessaire avant validation.",
+        "m_hyd": "NOTE HYDRA.", "m_tot": "NOTE TOTALE", "m_pate": "NOTE PÂTE", "m_asp": "NOTE ASPECT", "m_vol": "VOLUME",
         "h_good": "Bonne hydratation", "h_med": "Assez bonne hydratation",
         "l_good": "bon lissage", "l_fast": "lissage un peu rapide", "l_slow": "lissage un peu lent",
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
@@ -52,6 +53,7 @@ tr = {
     },
     "English": {
         "header_warn": "⚠️ This comment is a working draft. Please review parameters and adjust hydration if needed before validation.",
+        "m_hyd": "HYDRA. SCORE", "m_tot": "TOTAL SCORE", "m_pate": "DOUGH SCORE", "m_asp": "APPEAR. SCORE", "m_vol": "VOLUME",
         "h_good": "Good hydration", "h_med": "Fairly good hydration",
         "l_good": "good smoothing", "l_fast": "slightly fast smoothing", "l_slow": "slightly slow smoothing",
         "p_fin": "At the end of kneading, dough", "f_fac": "During shaping, dough", "equi": "balanced",
@@ -108,14 +110,12 @@ def join_final(lst, lang_dict):
 # --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
 
-# Sidebar
 st.sidebar.header("⚙️ Configuration")
 sample_type = st.sidebar.selectbox("1. Type d'échantillon", ["Farine de base", "Blé de force", "Farine corrigée"])
 sel_lang = st.sidebar.selectbox("2. Langue", ["Français", "English"])
 t = tr[sel_lang]
 uploaded_file = st.sidebar.file_uploader("3. Charger l'Excel BIPÉA", type="xlsx")
 
-# Bandeau d'avertissement en haut
 st.markdown(f'<div class="warning-box">{t["header_warn"]}</div>', unsafe_allow_html=True)
 
 if uploaded_file:
@@ -124,13 +124,18 @@ if uploaded_file:
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
         # --- RÉCUPÉRATION NOTES ---
-        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
+        hydra_val, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
+        # Note d'hydratation spécifique (souvent en ligne 30, colonne 3 ou similaire selon les versions Excel BIPÉA)
+        # On récupère ici la note brute d'hydratation (généralement sur 30)
+        n_hydra_score = float(df.iloc[30, 3]) 
 
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
-        m2.metric("NOTE PÂTE", f"{n_pate:.1f}/100")
-        m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
-        m4.metric("VOLUME", f"{int(vol)} cm³")
+        # Affichage des 5 Compteurs
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric(t["m_hyd"], f"{n_hydra_score:.1f}")
+        m2.metric(t["m_tot"], f"{n_tot:.1f}/100")
+        m3.metric(t["m_pate"], f"{n_pate:.1f}/30")
+        m4.metric(t["m_asp"], f"{n_asp:.1f}/70")
+        m5.metric(t["m_vol"], f"{int(vol)} cm³")
 
         # --- ANALYSE PÂTE ---
         lis = find_label_score(df, "Lissage", c_map)
@@ -165,7 +170,7 @@ if uploaded_file:
 
         # --- SEUILS DYNAMIQUES ---
         h_limit = 63 if "force" in sample_type.lower() else 61
-        h_txt = t["h_good"] if hydra >= h_limit else t["h_med"]
+        h_txt = t["h_good"] if hydra_val >= h_limit else t["h_med"]
         v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
         v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
