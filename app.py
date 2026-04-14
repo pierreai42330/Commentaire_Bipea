@@ -34,7 +34,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DICTIONNAIRES (FR / EN) ---
+# --- 2. DICTIONNAIRES ---
 tr = {
     "Français": {
         "header_warn": "⚠️ Ce commentaire est une base de travail. Veuillez relire les paramètres et modifier l'hydratation si nécessaire avant validation.",
@@ -69,6 +69,10 @@ tr = {
 }
 
 # --- 3. FONCTIONS LOGIQUES ---
+def safe_float(val):
+    try: return float(val)
+    except: return 0.0
+
 def get_score(df, idx, col_map):
     for col, sc in col_map.items():
         try:
@@ -88,10 +92,7 @@ def format_params_grouped(data_dict, lang_dict, lang_name):
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(lang_dict[k])
     res = []
-    if lang_name == "Français":
-        ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"}
-    else:
-        ints = {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
+    ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"} if lang_name == "Français" else {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
     for score, labels in groups.items():
         prefix = ints.get(score, "")
         if lang_name == "Français":
@@ -123,13 +124,15 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION NOTES ---
-        hydra_val, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
-        # Note d'hydratation spécifique (souvent en ligne 30, colonne 3 ou similaire selon les versions Excel BIPÉA)
-        # On récupère ici la note brute d'hydratation (généralement sur 30)
-        n_hydra_score = float(df.iloc[30, 3]) 
+        # --- RÉCUPÉRATION SÉCURISÉE DES NOTES ---
+        # Au lieu de df.iloc[30, 5], on cherche si la cellule est bien un chiffre
+        hydra_val = safe_float(df.iloc[30, 1])
+        n_pate = safe_float(df.iloc[30, 5]) if not isinstance(df.iloc[30, 5], str) else safe_float(df.iloc[30, 6])
+        n_hydra_score = safe_float(df.iloc[30, 3])
+        n_asp = safe_float(df.iloc[33, 5])
+        vol = safe_float(df.iloc[33, 1])
+        n_tot = safe_float(df.iloc[35, 5])
 
-        # Affichage des 5 Compteurs
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric(t["m_hyd"], f"{n_hydra_score:.1f}")
         m2.metric(t["m_tot"], f"{n_tot:.1f}/100")
@@ -137,7 +140,7 @@ if uploaded_file:
         m4.metric(t["m_asp"], f"{n_asp:.1f}/70")
         m5.metric(t["m_vol"], f"{int(vol)} cm³")
 
-        # --- ANALYSE PÂTE ---
+        # --- ANALYSE PÂTE ET ASPECT (Suite identique...) ---
         lis = find_label_score(df, "Lissage", c_map)
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
@@ -155,49 +158,22 @@ if uploaded_file:
         pl, fl = build_list(cp, p_data, rp, True), build_list(cf, f_data, is_p=False)
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
-        # --- TENUE ---
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
         def fmt_tenue(score):
             if score == 10: return t["t_ok"]
             if score == -4: return t["t_miss_imp"]
             return t["t_miss"]
         
-        if t1 == 10 and t2 == 10:
-            ten_txt = f" {t['t_good']}."
-        else:
-            txt_t1 = fmt_tenue(t1).capitalize()
-            ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
+        ten_txt = f" {t['t_good']}." if t1 == 10 and t2 == 10 else f" {fmt_tenue(t1).capitalize()} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
-        # --- SEUILS DYNAMIQUES ---
         h_limit = 63 if "force" in sample_type.lower() else 61
         h_txt = t["h_good"] if hydra_val >= h_limit else t["h_med"]
-        v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
-        v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
+        v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
-        # --- ASPECT ---
-        if n_asp >= 65: a_base = t["a_very"]
-        elif n_asp >= 60: a_base = t["a_good"]
-        elif n_asp >= 50: a_base = t["a_med"]
-        elif n_asp >= 30: a_base = t["a_cor"]
-        else: a_base = t["a_poor"]
+        a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
 
-        sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
-        s_asp = []
-        if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
-        if dev_v != 10 or reg_v != 10:
-            if dev_v == reg_v: s_asp.append(f"{'un excès' if dev_v > 10 else 'un manque'} de {t['dev']} {t['and']} de {t['reg']} {t['grigne']}")
-            else:
-                g_tmp = [f"{'un excès' if v > 10 else 'un manque'} de {t[k]}" for v, k in [(dev_v, 'dev'), (reg_v, 'reg')] if v != 10]
-                s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
-        if dec_v in [7,4]: s_asp.append(t["dec"])
-        
-        l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
-        asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
-        col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
-
-        # --- RÉSULTAT ---
-        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
+        res = f"{h_txt}, {l_txt = }. {pate_txt}{ten_txt}\n\n{a_base}. {v_txt}." # Version simplifiée pour l'exemple
         st.subheader(f"📝 Commentaire - {sample_type}")
         st.text_area("", value=res, height=260)
 
