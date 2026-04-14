@@ -110,7 +110,7 @@ def safe_float(df, row, col):
         return 0.0
 
 # --- 4. INTERFACE ---
-st.title("🍞 BIPÉA Analyzer Pro")
+st.title("🍞 BIPÉA Analyzer")
 
 st.sidebar.header("⚙️ Configuration")
 sample_type = st.sidebar.selectbox("1. Type d'échantillon", ["Farine de base", "Blé de force", "Farine corrigée"])
