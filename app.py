@@ -8,6 +8,15 @@ st.set_page_config(page_title="BIPÉA Analyzer Pro", page_icon="🍞", layout="w
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
+    .warning-box {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #ffeeba;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
     [data-testid="stMetric"] {
         background-color: #ffffff !important;
         padding: 15px !important;
@@ -28,6 +37,7 @@ st.markdown("""
 # --- 2. DICTIONNAIRES (FR / EN) ---
 tr = {
     "Français": {
+        "header_warn": "⚠️ Ce commentaire est une base de travail. Veuillez relire les paramètres et modifier l'hydratation si nécessaire avant validation.",
         "h_good": "Bonne hydratation", "h_med": "Assez bonne hydratation",
         "l_good": "bon lissage", "l_fast": "lissage un peu rapide", "l_slow": "lissage un peu lent",
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
@@ -41,6 +51,7 @@ tr = {
         "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
     "English": {
+        "header_warn": "⚠️ This comment is a working draft. Please review parameters and adjust hydration if needed before validation.",
         "h_good": "Good hydration", "h_med": "Fairly good hydration",
         "l_good": "good smoothing", "l_fast": "slightly fast smoothing", "l_slow": "slightly slow smoothing",
         "p_fin": "At the end of kneading, dough", "f_fac": "During shaping, dough", "equi": "balanced",
@@ -79,7 +90,6 @@ def format_params_grouped(data_dict, lang_dict, lang_name):
         ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"}
     else:
         ints = {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
-
     for score, labels in groups.items():
         prefix = ints.get(score, "")
         if lang_name == "Français":
@@ -98,18 +108,15 @@ def join_final(lst, lang_dict):
 # --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
 
+# Sidebar
 st.sidebar.header("⚙️ Configuration")
-# Mise à jour des types selon tes précisions
-sample_type = st.sidebar.selectbox(
-    "1. Type d'échantillon", 
-    ["Farine de base", "Blé de force", "Farine corrigée"],
-    help="Définit les échelles pour l'hydratation et le volume."
-)
-
-sel_lang = st.sidebar.selectbox("2. Langue / Language", ["Français", "English"])
+sample_type = st.sidebar.selectbox("1. Type d'échantillon", ["Farine de base", "Blé de force", "Farine corrigée"])
+sel_lang = st.sidebar.selectbox("2. Langue", ["Français", "English"])
 t = tr[sel_lang]
-
 uploaded_file = st.sidebar.file_uploader("3. Charger l'Excel BIPÉA", type="xlsx")
+
+# Bandeau d'avertissement en haut
+st.markdown(f'<div class="warning-box">{t["header_warn"]}</div>', unsafe_allow_html=True)
 
 if uploaded_file:
     try:
@@ -129,7 +136,6 @@ if uploaded_file:
         lis = find_label_score(df, "Lissage", c_map)
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
-        
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
@@ -158,17 +164,13 @@ if uploaded_file:
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
         # --- SEUILS DYNAMIQUES ---
-        # Hydratation : 63% pour le blé de force, 61% pour le reste
         h_limit = 63 if "force" in sample_type.lower() else 61
         h_txt = t["h_good"] if hydra >= h_limit else t["h_med"]
-
-        # Volume : Les farines (base/corrigée) ont des cibles plus hautes que les blés
         v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
         v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
         # --- ASPECT ---
-        # Utilisation de ton échelle de notation personnalisée
         if n_asp >= 65: a_base = t["a_very"]
         elif n_asp >= 60: a_base = t["a_good"]
         elif n_asp >= 50: a_base = t["a_med"]
@@ -197,5 +199,3 @@ if uploaded_file:
         components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold;\">{t['copy_btn']}</button>", height=80)
 
     except Exception as e: st.error(f"Erreur lors de l'analyse : {e}")
-else:
-    st.info("Sélectionnez le type d'échantillon puis chargez le fichier Excel.")
