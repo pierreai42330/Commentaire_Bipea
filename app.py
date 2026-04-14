@@ -34,7 +34,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DICTIONNAIRES (FR / EN) ---
+# --- 2. DICTIONNAIRES ---
 tr = {
     "Français": {
         "header_warn": "⚠️ Ce commentaire est une base de travail. Veuillez relire les paramètres et modifier l'hydratation si nécessaire avant validation.",
@@ -67,6 +67,17 @@ tr = {
 }
 
 # --- 3. FONCTIONS LOGIQUES ---
+def parse_val(df, row, col):
+    """Tente de lire un float, si c'est du texte, regarde la cellule à droite."""
+    val = df.iloc[row, col]
+    try:
+        return float(val)
+    except:
+        try:
+            return float(df.iloc[row, col + 1])
+        except:
+            return 0.0
+
 def get_score(df, idx, col_map):
     for col, sc in col_map.items():
         try:
@@ -86,10 +97,7 @@ def format_params_grouped(data_dict, lang_dict, lang_name):
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(lang_dict[k])
     res = []
-    if lang_name == "Français":
-        ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"}
-    else:
-        ints = {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
+    ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"} if lang_name == "Français" else {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
     for score, labels in groups.items():
         prefix = ints.get(score, "")
         if lang_name == "Français":
@@ -108,14 +116,12 @@ def join_final(lst, lang_dict):
 # --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
 
-# Sidebar
 st.sidebar.header("⚙️ Configuration")
 sample_type = st.sidebar.selectbox("1. Type d'échantillon", ["Farine de base", "Blé de force", "Farine corrigée"])
 sel_lang = st.sidebar.selectbox("2. Langue", ["Français", "English"])
 t = tr[sel_lang]
 uploaded_file = st.sidebar.file_uploader("3. Charger l'Excel BIPÉA", type="xlsx")
 
-# Bandeau d'avertissement en haut
 st.markdown(f'<div class="warning-box">{t["header_warn"]}</div>', unsafe_allow_html=True)
 
 if uploaded_file:
@@ -123,12 +129,14 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- RÉCUPÉRATION NOTES ---
-        # Note Hydratation brute (souvent colonne 3 ligne 30)
-        n_hydra_score = float(df.iloc[30, 3]) 
-        hydra, n_pate, n_asp, vol, n_tot = float(df.iloc[30, 1]), float(df.iloc[30, 5]), float(df.iloc[33, 5]), float(df.iloc[33, 1]), float(df.iloc[35, 5])
+        # --- RÉCUPÉRATION DES NOTES SÉCURISÉE ---
+        n_hydra_score = parse_val(df, 30, 3) 
+        hydra = parse_val(df, 30, 1)
+        n_pate = parse_val(df, 30, 5)
+        n_asp = parse_val(df, 33, 5)
+        vol = parse_val(df, 33, 1)
+        n_tot = parse_val(df, 35, 5)
 
-        # Affichage en 5 colonnes au lieu de 4
         m0, m1, m2, m3, m4 = st.columns(5)
         m0.metric("NOTE HYDRA.", f"{n_hydra_score:.1f}")
         m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
@@ -154,27 +162,20 @@ if uploaded_file:
         pl, fl = build_list(cp, p_data, rp, True), build_list(cf, f_data, is_p=False)
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
-        # --- TENUE ---
         t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
         def fmt_tenue(score):
             if score == 10: return t["t_ok"]
             if score == -4: return t["t_miss_imp"]
             return t["t_miss"]
         
-        if t1 == 10 and t2 == 10:
-            ten_txt = f" {t['t_good']}."
-        else:
-            txt_t1 = fmt_tenue(t1).capitalize()
-            ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
+        ten_txt = f" {t['t_good']}." if t1 == 10 and t2 == 10 else f" {fmt_tenue(t1).capitalize()} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
-        # --- SEUILS DYNAMIQUES ---
         h_limit = 63 if "force" in sample_type.lower() else 61
         h_txt = t["h_good"] if hydra >= h_limit else t["h_med"]
-        v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
-        v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
+        v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
-        # --- ASPECT ---
+        # Échelle aspect utilisateur
         if n_asp >= 65: a_base = t["a_very"]
         elif n_asp >= 60: a_base = t["a_good"]
         elif n_asp >= 50: a_base = t["a_med"]
@@ -195,7 +196,6 @@ if uploaded_file:
         asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
-        # --- RÉSULTAT ---
         res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
         st.subheader(f"📝 Commentaire - {sample_type}")
         st.text_area("", value=res, height=260)
