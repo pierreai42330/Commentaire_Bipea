@@ -50,7 +50,7 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "cons": "consistency", "ext": "extensibility", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
+        "cons": "consistency", "ext": "extensibilité", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
@@ -74,7 +74,6 @@ def format_params_grouped(data_dict, lang_dict, lang_name):
     groups = {}
     for k, v in data_dict.items():
         if v != 10: groups.setdefault(v, []).append(lang_dict[k])
-    
     res = []
     if lang_name == "Français":
         ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"}
@@ -98,11 +97,19 @@ def join_final(lst, lang_dict):
 
 # --- 4. INTERFACE ---
 st.title("🍞 BIPÉA Analyzer Pro")
-sel_lang = st.sidebar.selectbox("🌐 Langue / Language", ["Français", "English"])
+
+# SELECTION DU TYPE D'ECHANTILLON AVANT TOUT
+st.sidebar.header("⚙️ Configuration")
+sample_type = st.sidebar.selectbox(
+    "1. Type d'échantillon", 
+    ["Farine de base (BPMF)", "Farine de force", "Blé (BIPEA)", "Farine corrigée"],
+    help="Définit les échelles de notation pour l'hydratation et le volume."
+)
+
+sel_lang = st.sidebar.selectbox("2. Langue / Language", ["Français", "English"])
 t = tr[sel_lang]
 
-uploaded_file = st.sidebar.file_uploader("📥 Charger l'Excel BIPÉA", type="xlsx")
-type_p = st.sidebar.selectbox("Farine", ["Blé BPMF", "Blé de force", "Farine de base", "Farine corrigée"])
+uploaded_file = st.sidebar.file_uploader("3. Charger l'Excel BIPÉA", type="xlsx")
 
 if uploaded_file:
     try:
@@ -123,7 +130,6 @@ if uploaded_file:
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
         
-        # Façonnage (Sans consistance ni relâchement)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         cf = get_score(df, 20, c_map)
 
@@ -151,10 +157,21 @@ if uploaded_file:
             txt_t1 = fmt_tenue(t1).capitalize()
             ten_txt = f" {txt_t1} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
-        # --- ASPECT ---
-        sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
+        # --- DYNAMIQUE DES SEUILS (Echelles Marion) ---
+        # Hydratation
+        h_limit = 63 if "force" in sample_type.lower() else 61 if "farine" in sample_type.lower() else 60
+        h_txt = t["h_good"] if hydra >= h_limit else t["h_med"]
+
+        # Volume
+        v_limit_very = 1850 if "farine" in sample_type.lower() else 1750
+        v_limit_good = 1650 if "farine" in sample_type.lower() else 1550
+        v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
+
+        # Aspect (Seuils Marion)
         a_base = t["a_very"] if n_asp >= 65 else t["a_good"] if n_asp >= 60 else t["a_med"] if n_asp >= 50 else t["a_cor"] if n_asp >= 30 else t["a_poor"]
-        
+
+        # --- ASPECT DÉTAILS ---
+        sec_v, col_v, dev_v, reg_v, dec_v = get_score(df, 33, c_map), get_score(df, 34, c_map), get_score(df, 37, c_map), get_score(df, 38, c_map), get_score(df, 39, c_map)
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
         if dev_v != 10 or reg_v != 10:
@@ -164,17 +181,17 @@ if uploaded_file:
                 s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
         if dec_v in [7,4]: s_asp.append(t["dec"])
         
-        h_txt = t["h_good"] if hydra >= (63 if "force" in type_p.lower() else 61) else t["h_med"]
         l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
         asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
-        v_txt = t["v_very"] if vol > 1850 else t["v_good"] if vol > 1650 else t["v_sat"]
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
         # --- RÉSULTAT ---
         res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
-        st.subheader("📝 Commentaire")
+        st.subheader(f"📝 Commentaire - {sample_type}")
         st.text_area("", value=res, height=260)
 
         components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold;\">{t['copy_btn']}</button>", height=80)
 
-    except Exception as e: st.error(f"Erreur : {e}")
+    except Exception as e: st.error(f"Erreur lors de l'analyse : {e}")
+else:
+    st.info("Sélectionnez le type de produit puis chargez votre fichier Excel pour générer le commentaire.")
