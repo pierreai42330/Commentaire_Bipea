@@ -103,7 +103,6 @@ def join_final(lst, lang_dict):
     return f", ".join(lst[:-1]) + f" {lang_dict['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else lang_dict["equi"])
 
 def safe_float(df, row, col):
-    """Tente de convertir une cellule en float, renvoie 0.0 si texte ou erreur."""
     try:
         val = df.iloc[row, col]
         return float(val)
@@ -126,26 +125,14 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file, header=None)
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
-        # --- LECTURE SÉCURISÉE DES DONNÉES ---
-        # Note Hydratation (B31)
-        n_hydra_score = safe_float(df, 30, 1)
-        
-        # Hydratation réelle %
+        # --- LECTURE NOTES ---
+        n_hydra_score = safe_float(df, 30, 1) # B31
         hydra_pct = safe_float(df, 30, 1)
-        
-        # Note Pâte (F31)
         n_pate = safe_float(df, 30, 5)
-        
-        # Note Aspect (F34)
         n_asp = safe_float(df, 33, 5)
-        
-        # Volume (B34)
         vol = safe_float(df, 33, 1)
-        
-        # Note Totale (F36)
         n_tot = safe_float(df, 35, 5)
 
-        # Affichage des 5 métriques
         m0, m1, m2, m3, m4 = st.columns(5)
         m0.metric("NOTE HYDRA.", f"{n_hydra_score:.1f}")
         m1.metric("NOTE TOTALE", f"{n_tot:.1f}/100")
@@ -177,31 +164,50 @@ if uploaded_file:
             if score == 10: return t["t_ok"]
             if score == -4: return t["t_miss_imp"]
             return t["t_miss"]
-        
         ten_txt = f" {t['t_good']}." if t1 == 10 and t2 == 10 else f" {fmt_tenue(t1).capitalize()} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
 
-        # --- SEUILS DYNAMIQUES ---
-        h_limit = 63 if "force" in sample_type.lower() else 61
-        h_txt = t["h_good"] if hydra_pct >= h_limit else t["h_med"]
-        l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
-
-        v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
-        v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
-
-        # --- ÉCHELLE ASPECT SPÉCIFIQUE ---
+        # --- SEUILS ASPECT ---
         if n_asp >= 65: a_base = t["a_very"]
         elif n_asp >= 60: a_base = t["a_good"]
         elif n_asp >= 50: a_base = t["a_med"]
         elif n_asp >= 30: a_base = t["a_cor"]
         else: a_base = t["a_poor"]
 
-        # --- RÉSULTAT FINAL ---
-        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{a_base}. {v_txt}."
+        # --- ANALYSE DÉTAILLÉE ASPECT (Coup de lame, Croûte, Section) ---
+        # On récupère les scores des lignes spécifiques d'aspect
+        sec_v = get_score(df, 33, c_map) # Section
+        col_v = get_score(df, 34, c_map) # Coloration
+        dev_v = get_score(df, 37, c_map) # Développement grigne
+        reg_v = get_score(df, 38, c_map) # Régularité grigne
+        dec_v = get_score(df, 39, c_map) # Déchirement
+
+        s_asp = []
+        if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
+        
+        # Logique pour la grigne (développement et régularité)
+        if dev_v != 10 or reg_v != 10:
+            if dev_v == reg_v:
+                s_asp.append(f"{'un excès' if dev_v > 10 else 'un manque'} de {t['dev']} {t['and']} de {t['reg']} {t['grigne']}")
+            else:
+                g_tmp = [f"{'un excès' if v > 10 else 'un manque'} de {t[k]}" for v, k in [(dev_v, 'dev'), (reg_v, 'reg')] if v != 10]
+                s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
+        
+        if dec_v in [7, 4]: s_asp.append(t["dec"]) # Déchirement
+        
+        asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
+        col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
+
+        # --- VOLUME ET FINAL ---
+        h_limit = 63 if "force" in sample_type.lower() else 61
+        h_txt = t["h_good"] if hydra_pct >= h_limit else t["h_med"]
+        l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
+        v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
+        v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
+
+        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
         
         st.subheader(f"📝 Commentaire - {sample_type}")
         st.text_area("", value=res, height=260)
-
-        # Bouton Copier
         components.html(f"<button onclick=\"navigator.clipboard.writeText(`{res}`);alert('Copié !')\" style=\"width:100%; background:#007bff; color:white; border:none; padding:15px; border-radius:10px; cursor:pointer; font-weight:bold;\">{t['copy_btn']}</button>", height=80)
 
     except Exception as e: 
