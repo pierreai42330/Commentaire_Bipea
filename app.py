@@ -93,7 +93,6 @@ def find_label_score(df, label, col_map):
 
 # Fonction universelle pour extraire la description d'une ligne selon la lettre de la colonne cochée
 def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
-    # Lettres de colonnes associées à leurs index réels dans le DataFrame pandas
     col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17}
     for letter, col_idx in col_letter_to_idx.items():
         try:
@@ -163,24 +162,17 @@ if uploaded_file:
         m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
-        # --- ANALYSE DYNAMIQUE (LISSAGE & COLLANT) ---
+        # --- ANALYSE LISSAGE ---
         # Lissage : Ligne 13 Excel -> Index Python 12
         l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
         
-        # Collant : Ligne 14 Excel -> Index Python 13
-        collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
-
-        # Assemblage du bloc hydratation/lissage/collant
-        if collant_txt:
-            # Si le lissage et le collant ont une valeur, on les assemble proprement
-            l_txt = f"{l_txt} {t['and']} {collant_txt.lower() if sel_lang == 'Français' else collant_txt}"
-
-        # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
+        # --- ANALYSE PÂTE COMPLÉMENTAIRE & COLLANT ---
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         rp = find_label_score(df, "Relâchement", c_map)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         
-        # Note : On n'utilise plus find_label_score ni cp/cf pour le collant car géré via get_description_by_column ci-dessus
+        # Collant : Ligne 14 Excel -> Index Python 13
+        collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
 
         def build_list(data, rel=10, is_p=True):
             l = []
@@ -189,6 +181,11 @@ if uploaded_file:
             return l
 
         pl, fl = build_list(p_data, rp, True), build_list(f_data, is_p=False)
+        
+        # Insertion du collant uniquement dans la liste du pétrissage (pl) s'il existe
+        if collant_txt:
+            pl.append(collant_txt)
+
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
         # --- TENUE ---
