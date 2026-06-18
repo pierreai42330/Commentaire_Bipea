@@ -46,8 +46,7 @@ tr = {
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "sec": "section", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
-        "ext": "extensibilité", "ela": "élasticité", "rel": "relâchante",
-        "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
+        "rel": "relâchante", "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
     "English": {
         "header_warn": "⚠️ This comment is a working draft. Please review parameters and adjust hydration if needed before validation.",
@@ -59,8 +58,7 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "ext": "extensibilité", "ela": "élasticité", "rel": "slackening",
-        "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
+        "rel": "slackening", "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
 
@@ -77,6 +75,14 @@ parametres_mapping = {
     "Consistance": {  # Ligne 15 (index 14)
         "Français": {"L": "en manque très important de consistance", "M": "en manque important de consistance", "N": "en manque de consistance", "O": "", "P": "en excès de consistance", "Q": "en excès important de consistance", "R": "en excès très important de consistance"},
         "English": {"L": "with a very significant lack of consistency", "M": "with a significant lack of consistency", "N": "lacking consistency", "O": "", "P": "with excessive consistency", "Q": "with highly excessive consistency", "R": "with a very high excess of consistency"}
+    },
+    "Extensibilité": {  # Ligne 16 (index 15)
+        "Français": {"L": "en manque très important d'extensibilité", "M": "en manque important d'extensibilité", "N": "en manque d'extensibilité", "O": "", "P": "en excès d'extensibilité", "Q": "en excès important d'extensibilité", "R": "en excès très important d'extensibilité"},
+        "English": {"L": "with a very significant lack of extensibility", "M": "with a significant lack of extensibility", "N": "lacking extensibility", "O": "", "P": "with excessive extensibility", "Q": "with highly excessive extensibility", "R": "with a very high excess of extensibility"}
+    },
+    "Elasticité": {  # Ligne 17 (index 16)
+        "Français": {"L": "en manque très important d'élasticité", "M": "en manque important d'élasticité", "N": "en manque d'élasticité", "O": "", "P": "en excès d'élasticité", "Q": "en excès important d'élasticité", "R": "en excès très important d'élasticité"},
+        "English": {"L": "with a very significant lack of elasticity", "M": "with a significant lack of elasticity", "N": "lacking elasticity", "O": "", "P": "with excessive elasticity", "Q": "with highly excessive elasticity", "R": "with a very high excess of elasticity"}
     }
 }
 
@@ -170,35 +176,31 @@ if uploaded_file:
         l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
         
         # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
-        # Note : On retire "cons" (Consistance) de p_data puisqu'on le gère de façon personnalisée maintenant
-        p_data = {"ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         rp = find_label_score(df, "Relâchement", c_map)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         
-        # Extraction du Collant (Index 13) et de la Consistance (Index 14)
+        # Extraction dynamique de tous les paramètres du pétrissage par colonne cochez
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
         consistance_txt = get_description_by_column(df, 14, parametres_mapping["Consistance"][sel_lang], default_value="")
+        extensibilite_txt = get_description_by_column(df, 15, parametres_mapping["Extensibilité"][sel_lang], default_value="")
+        elasticite_txt = get_description_by_column(df, 16, parametres_mapping["Elasticité"][sel_lang], default_value="")
 
-        # Construction de la liste en suivant l'ordre strict demandé
-        def build_list(data, rel=10, is_p=True):
+        # Construction de la liste en suivant l'ordre strict demandé : 
+        # Collant -> Consistance -> Extensibilité -> Élasticité -> Relâchement
+        def build_list(is_p=True):
             l = []
             if is_p:
-                # 1. Collant (au début si présent)
-                if collant_txt:
-                    l.append(collant_txt)
-                # 2. Consistance (juste après le collant si présent)
-                if consistance_txt:
-                    l.append(consistance_txt)
-            
-            # 3. Extensibilité & Élasticité restants
-            l.extend(format_params_grouped(data, t, sel_lang))
-            
-            # 4. Relâchement (tout à la fin si présent)
-            if is_p and rel != 10: 
-                l.append(t["rel"])
+                if collant_txt: l.append(collant_txt)
+                if consistance_txt: l.append(consistance_txt)
+                if extensibilite_txt: l.append(extensibilite_txt)
+                if elasticite_txt: l.append(elasticite_txt)
+                if rp != 10: l.append(t["rel"])
+            else:
+                # Pour le façonnage, on conserve l'ancienne logique groupée basée sur f_data
+                l.extend(format_params_grouped(f_data, t, sel_lang))
             return l
 
-        pl, fl = build_list(p_data, rp, True), build_list(f_data, is_p=False)
+        pl, fl = build_list(is_p=True), build_list(is_p=False)
 
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
