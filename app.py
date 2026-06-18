@@ -39,7 +39,6 @@ tr = {
     "Français": {
         "header_warn": "⚠️ Ce commentaire est une base de travail. Veuillez relire les paramètres et modifier l'hydratation si nécessaire avant validation.",
         "h_good": "Bonne hydratation", "h_med": "Assez bonne hydratation",
-        "l_good": "bon lissage", "l_fast": "lissage un peu rapide", "l_slow": "lissage un peu lent",
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
         "same": "gardant le même profil tout au long du processus",
         "t_good": "Bonne tenue aux deux enfournements", "t_1": "au premier enfournement", "t_2": "au second",
@@ -53,7 +52,6 @@ tr = {
     "English": {
         "header_warn": "⚠️ This comment is a working draft. Please review parameters and adjust hydration if needed before validation.",
         "h_good": "Good hydration", "h_med": "Fairly good hydration",
-        "l_good": "good smoothing", "l_fast": "slightly fast smoothing", "l_slow": "slightly slow smoothing",
         "p_fin": "At the end of kneading, dough", "f_fac": "During shaping, dough", "equi": "balanced",
         "same": "keeping the same profile throughout the process",
         "t_good": "Good stability at both loadings", "t_1": "at the first loading", "t_2": "at the second",
@@ -63,6 +61,18 @@ tr = {
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
         "cons": "consistency", "ext": "extensibility", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
+    }
+}
+
+# Dictionnaires spécifiques pour le lissage par colonne (Ligne 13 Excel -> index 12)
+lissage_mapping = {
+    "Français": {
+        "L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", 
+        "O": "Bon lissage", "P": "Lissage un peu rapide"
+    },
+    "English": {
+        "L": "Very slow smoothing", "M": "Slow smoothing", "N": "Slightly slow smoothing", 
+        "O": "Good smoothing", "P": "Slightly fast smoothing"
     }
 }
 
@@ -80,6 +90,19 @@ def find_label_score(df, label, col_map):
         vals = [str(v).strip().lower() for v in df.iloc[i].values]
         if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
+
+# Nouvelle fonction dédiée pour récupérer la description textuelle selon la colonne cochée
+def get_description_by_column(df, row_idx, mapping_lang):
+    # Les colonnes L, M, N, O, P correspondent aux index de colonnes 11, 12, 13, 14, 15
+    col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15}
+    for letter, col_idx in col_letter_to_idx.items():
+        try:
+            val = str(df.iloc[row_idx, col_idx]).strip().upper()
+            if val == 'X':
+                return mapping_lang.get(letter, "lissage correct")
+        except:
+            continue
+    return "lissage correct"
 
 def format_params_grouped(data_dict, lang_dict, lang_name):
     groups = {}
@@ -141,7 +164,9 @@ if uploaded_file:
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
         # --- ANALYSE PÂTE ---
-        lis = find_label_score(df, "Lissage", c_map)
+        # Modification : Extraction du texte de Lissage sur la Ligne 13 de l'Excel (index 12 du Dataframe)
+        l_txt = get_description_by_column(df, 12, lissage_mapping[sel_lang])
+
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
@@ -174,7 +199,6 @@ if uploaded_file:
         else: a_base = t["a_poor"]
 
         # --- ANALYSE DÉTAILLÉE ASPECT (Coup de lame, Croûte, Section) ---
-        # On récupère les scores des lignes spécifiques d'aspect
         sec_v = get_score(df, 33, c_map) # Section
         col_v = get_score(df, 34, c_map) # Coloration
         dev_v = get_score(df, 37, c_map) # Développement grigne
@@ -184,7 +208,6 @@ if uploaded_file:
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
         
-        # Logique pour la grigne (développement et régularité)
         if dev_v != 10 or reg_v != 10:
             if dev_v == reg_v:
                 s_asp.append(f"{'un excès' if dev_v > 10 else 'un manque'} de {t['dev']} {t['and']} de {t['reg']} {t['grigne']}")
@@ -200,11 +223,11 @@ if uploaded_file:
         # --- VOLUME ET FINAL ---
         h_limit = 63 if "force" in sample_type.lower() else 61
         h_txt = t["h_good"] if hydra_pct >= h_limit else t["h_med"]
-        l_txt = {10: t["l_good"], 7: t["l_fast"], -7: t["l_slow"]}.get(lis, "correct")
         v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
-        res = f"{h_txt}, {l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
+        # Construction de la phrase finale avec la nouvelle variable l_txt mise en forme
+        res = f"{h_txt}, {l_txt.lower() if sel_lang == 'Français' else l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
         
         st.subheader(f"📝 Commentaire - {sample_type}")
         st.text_area("", value=res, height=260)
