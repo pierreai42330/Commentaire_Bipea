@@ -46,7 +46,7 @@ tr = {
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "sec": "section", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
-        "cons": "consistance", "ext": "extensibilité", "ela": "élasticité", "rel": "relâchante", "collant": "collante",
+        "cons": "consistance", "ext": "extensibilité", "ela": "élasticité", "rel": "relâchante",
         "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
     "English": {
@@ -59,20 +59,20 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "cons": "consistency", "ext": "extensibility", "ela": "elasticity", "rel": "slackening", "collant": "sticky",
+        "cons": "consistency", "ext": "extensibility", "ela": "elasticity", "rel": "slackening",
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
 
-# Dictionnaires spécifiques pour le lissage par colonne (Ligne 13 Excel -> index 12)
-lissage_mapping = {
-    "Français": {
-        "L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", 
-        "O": "Bon lissage", "P": "Lissage un peu rapide"
+# Configuration des dictionnaires personnalisés par ligne et par colonne
+parametres_mapping = {
+    "Lissage": {  # Ligne 13 (index 12)
+        "Français": {"L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", "O": "Bon lissage", "P": "Lissage un peu rapide"},
+        "English": {"L": "Very slow smoothing", "M": "Slow smoothing", "N": "Slightly slow smoothing", "O": "Good smoothing", "P": "Slightly fast smoothing"}
     },
-    "English": {
-        "L": "Very slow smoothing", "M": "Slow smoothing", "N": "Slightly slow smoothing", 
-        "O": "Good smoothing", "P": "Slightly fast smoothing"
+    "Collant": {  # Ligne 14 (index 13)
+        "Français": {"O": "", "P": "collante", "Q": "très collante", "R": "très collante"},
+        "English": {"O": "", "P": "sticky", "Q": "very sticky", "R": "very sticky"}
     }
 }
 
@@ -91,18 +91,18 @@ def find_label_score(df, label, col_map):
         if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
 
-# Nouvelle fonction dédiée pour récupérer la description textuelle selon la colonne cochée
-def get_description_by_column(df, row_idx, mapping_lang):
-    # Les colonnes L, M, N, O, P correspondent aux index de colonnes 11, 12, 13, 14, 15
-    col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15}
+# Fonction universelle pour extraire la description d'une ligne selon la lettre de la colonne cochée
+def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
+    # Lettres de colonnes associées à leurs index réels dans le DataFrame pandas
+    col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17}
     for letter, col_idx in col_letter_to_idx.items():
         try:
             val = str(df.iloc[row_idx, col_idx]).strip().upper()
             if val == 'X':
-                return mapping_lang.get(letter, "lissage correct")
+                return mapping_lang.get(letter, default_value)
         except:
             continue
-    return "lissage correct"
+    return default_value
 
 def format_params_grouped(data_dict, lang_dict, lang_name):
     groups = {}
@@ -163,24 +163,32 @@ if uploaded_file:
         m3.metric("NOTE ASPECT", f"{n_asp:.1f}/70")
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
-        # --- ANALYSE PÂTE ---
-        # Modification : Extraction du texte de Lissage sur la Ligne 13 de l'Excel (index 12 du Dataframe)
-        l_txt = get_description_by_column(df, 12, lissage_mapping[sel_lang])
+        # --- ANALYSE DYNAMIQUE (LISSAGE & COLLANT) ---
+        # Lissage : Ligne 13 Excel -> Index Python 12
+        l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
+        
+        # Collant : Ligne 14 Excel -> Index Python 13
+        collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
 
+        # Assemblage du bloc hydratation/lissage/collant
+        if collant_txt:
+            # Si le lissage et le collant ont une valeur, on les assemble proprement
+            l_txt = f"{l_txt} {t['and']} {collant_txt.lower() if sel_lang == 'Français' else collant_txt}"
+
+        # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
-        cp, rp = find_label_score(df, "Collant", c_map), find_label_score(df, "Relâchement", c_map)
+        rp = find_label_score(df, "Relâchement", c_map)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
-        cf = get_score(df, 20, c_map)
+        
+        # Note : On n'utilise plus find_label_score ni cp/cf pour le collant car géré via get_description_by_column ci-dessus
 
-        def build_list(coll, data, rel=10, is_p=True):
+        def build_list(data, rel=10, is_p=True):
             l = []
-            if coll == 7: l.append(t["collant"])
-            elif coll == 4: l.append("très collante" if sel_lang == "Français" else "very sticky")
             l.extend(format_params_grouped(data, t, sel_lang))
             if is_p and rel != 10: l.append(t["rel"])
             return l
 
-        pl, fl = build_list(cp, p_data, rp, True), build_list(cf, f_data, is_p=False)
+        pl, fl = build_list(p_data, rp, True), build_list(f_data, is_p=False)
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
         # --- TENUE ---
@@ -198,12 +206,12 @@ if uploaded_file:
         elif n_asp >= 30: a_base = t["a_cor"]
         else: a_base = t["a_poor"]
 
-        # --- ANALYSE DÉTAILLÉE ASPECT (Coup de lame, Croûte, Section) ---
-        sec_v = get_score(df, 33, c_map) # Section
-        col_v = get_score(df, 34, c_map) # Coloration
-        dev_v = get_score(df, 37, c_map) # Développement grigne
-        reg_v = get_score(df, 38, c_map) # Régularité grigne
-        dec_v = get_score(df, 39, c_map) # Déchirement
+        # --- ANALYSE DÉTAILLÉE ASPECT ---
+        sec_v = get_score(df, 33, c_map)
+        col_v = get_score(df, 34, c_map)
+        dev_v = get_score(df, 37, c_map)
+        reg_v = get_score(df, 38, c_map)
+        dec_v = get_score(df, 39, c_map)
 
         s_asp = []
         if sec_v != 10: s_asp.append(f"{'un excès' if sec_v > 10 else 'un manque'} de {t['sec']}")
@@ -215,7 +223,7 @@ if uploaded_file:
                 g_tmp = [f"{'un excès' if v > 10 else 'un manque'} de {t[k]}" for v, k in [(dev_v, 'dev'), (reg_v, 'reg')] if v != 10]
                 s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
         
-        if dec_v in [7, 4]: s_asp.append(t["dec"]) # Déchirement
+        if dec_v in [7, 4]: s_asp.append(t["dec"])
         
         asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
@@ -226,7 +234,7 @@ if uploaded_file:
         v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
         v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
-        # Construction de la phrase finale avec la nouvelle variable l_txt mise en forme
+        # Construction finale du texte
         res = f"{h_txt}, {l_txt.lower() if sel_lang == 'Français' else l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
         
         st.subheader(f"📝 Commentaire - {sample_type}")
