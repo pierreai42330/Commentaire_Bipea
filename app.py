@@ -45,7 +45,7 @@ tr = {
         "t_ok": "bonne tenue",
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "dec": "un déchirement du coup de lame",
-        "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
+        "col": "coloration de la croûte", 
         "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
     "English": {
@@ -57,7 +57,7 @@ tr = {
         "t_ok": "good stability",
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "dec": "tearing of the blade cut",
-        "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
+        "col": "crust coloration", 
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
@@ -73,7 +73,6 @@ libelles_intensite = {
     }
 }
 
-# Mapping allégé contenant uniquement les qualificatifs (le type "manque/excès de" est géré dynamiquement)
 parametres_mapping = {
     "Lissage": {
         "Français": {"L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", "O": "Bon lissage", "P": "Lissage un peu rapide"},
@@ -235,13 +234,12 @@ if uploaded_file:
         elif n_asp >= 30: a_base = t["a_cor"]
         else: a_base = t["a_poor"]
 
-        # --- ANALYSE EN PROFONDEUR DE L'ASPECT (SECTION & GRIGNE) ---
+        # --- ANALYSE EN PROFONDEUR DE L'ASPECT ---
         sec_lettre = get_column_letter(df, 33)   # Ligne 34
         gri_lettre = get_column_letter(df, 37)   # Ligne 38
         col_v = get_score(df, 34, c_map)          # Ligne 35
         dec_v = get_score(df, 39, c_map)          # Ligne 40
 
-        # Dictionnaires internes de qualificatifs pour l'aspect (Français/English)
         mots_intensite = {
             "Français": {"L": "absence de ", "M": "manque important de ", "N": "manque de ", "O": "", "P": "excès de "},
             "English": {"L": "absence of ", "M": "significant lack of ", "N": "lack of ", "O": "", "P": "excess of "}
@@ -253,15 +251,12 @@ if uploaded_file:
 
         aspect_elements = []
 
-        # Cas regroupé intelligent : Si section et développement partagent exactement la même anomalie (ex: "manque de")
         if sec_lettre == gri_lettre and sec_lettre in ["L", "M", "N", "P"]:
             qualif = mots_intensite[sel_lang][sec_lettre]
             lbl_sec = labels_aspect[sel_lang]["sec"]
             lbl_gri = labels_aspect[sel_lang]["gri"]
-            conj = t["and"]
             aspect_elements.append(f"un {qualif}{lbl_sec}, de {lbl_gri}" if sel_lang == "Français" else f"a {qualif}{lbl_sec}, and {lbl_gri}")
         else:
-            # Traitement séparé individuel si différents
             if sec_lettre in ["L", "M", "N", "P"]:
                 qualif = mots_intensite[sel_lang][sec_lettre]
                 lbl = labels_aspect[sel_lang]["sec"]
@@ -271,10 +266,8 @@ if uploaded_file:
                 lbl = labels_aspect[sel_lang]["gri"]
                 aspect_elements.append(f"un {qualif}{lbl}" if sel_lang == "Français" else f"a {qualif}{lbl}")
 
-        # Ajout final du déchirement (avec préfixe "avec" s'il y a d'autres éléments, sinon directement)
         if dec_v in [7, 4]:
             if aspect_elements and sel_lang == "Français":
-                # Jointure propre des anomalies précédentes, suivie de "et avec un déchirement..."
                 phrase_prev = ", ".join(aspect_elements[:-1]) + f" {t['and']} " + aspect_elements[-1] if len(aspect_elements) > 1 else aspect_elements[0]
                 asp_f = f"{a_base} {t['with']} {phrase_prev} {t['and']} avec {t['dec']}"
             else:
@@ -285,11 +278,39 @@ if uploaded_file:
 
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
-        # --- VOLUME ET FINAL ---
-        h_limit = 63 if "force" in sample_type.lower() else 61
+        # --- DYNAMISATION DU BARÈME DE VOLUME ---
+        is_ble_de_force = "force" in sample_type.lower()
+        
+        # Configuration des libellés selon la langue
+        if sel_lang == "Français":
+            v_labels = {
+                "mediocre": "Volume médiocre", "correct": "Volume correct", 
+                "satisfaisant": "Volume satisfaisant", "assez_bon": "Assez bon volume", 
+                "bon": "Bon volume", "tres_bon": "Très bon volume"
+            }
+        else:
+            v_labels = {
+                "mediocre": "Poor volume", "correct": "Correct volume", 
+                "satisfaisant": "Satisfactory volume", "assez_bon": "Fairly good volume", 
+                "bon": "Good volume", "tres_bon": "Very good volume"
+            }
+
+        if is_ble_de_force:
+            if vol > 1800: v_txt = v_labels["bon"]
+            elif vol > 1600: v_txt = v_labels["assez_bon"]
+            elif vol > 1500: v_txt = v_labels["satisfaisant"]
+            elif vol > 1350: v_txt = v_labels["correct"]
+            else: v_txt = v_labels["mediocre"]
+        else:  # Farine de base et Farine corrigée
+            if vol > 1800: v_txt = v_labels["tres_bon"]
+            elif vol > 1600: v_txt = v_labels["bon"]
+            elif vol > 1500: v_txt = v_labels["assez_bon"]
+            elif vol > 1350: v_txt = v_labels["satisfaisant"]
+            else: v_txt = v_labels["correct"]
+
+        # --- HYDRATATION FACTOR ---
+        h_limit = 63 if is_ble_de_force else 61
         h_txt = t["h_good"] if hydra_pct >= h_limit else t["h_med"]
-        v_limit_very, v_limit_good = (1850, 1650) if "farine" in sample_type.lower() else (1750, 1550)
-        v_txt = t["v_very"] if vol > v_limit_very else t["v_good"] if vol > v_limit_good else t["v_sat"]
 
         # Construction finale du texte
         res = f"{h_txt}, {l_txt.lower() if sel_lang == 'Français' else l_txt}. {pate_txt}{ten_txt}\n\n{asp_f}. {col_txt} {v_txt}."
