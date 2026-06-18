@@ -83,6 +83,14 @@ parametres_mapping = {
     "Elasticité": {  # Ligne 17 (index 16)
         "Français": {"L": "en manque très important d'élasticité", "M": "en manque important d'élasticité", "N": "en manque d'élasticité", "O": "", "P": "en excès d'élasticité", "Q": "en excès important d'élasticité", "R": "en excès très important d'élasticité"},
         "English": {"L": "with a very significant lack of elasticity", "M": "with a significant lack of elasticity", "N": "lacking elasticity", "O": "", "P": "with excessive elasticity", "Q": "with highly excessive elasticity", "R": "with a very high excess of elasticity"}
+    },
+    "Extensibilité_Façonnage": {  # Ligne 22 (index 21)
+        "Français": {"L": "en manque très important d'extensibilité", "M": "en manque important d'extensibilité", "N": "en manque d'extensibilité", "O": "", "P": "en excès d'extensibilité", "Q": "en excès important d'extensibilité", "R": "en excès très important d'extensibilité"},
+        "English": {"L": "with a very significant lack of extensibility", "M": "with a significant lack of extensibility", "N": "lacking extensibility", "O": "", "P": "with excessive extensibility", "Q": "with highly excessive extensibility", "R": "with a very high excess of extensibility"}
+    },
+    "Elasticité_Façonnage": {  # Ligne 24 (index 23)
+        "Français": {"L": "en manque très important d'élasticité", "M": "en manque important d'élasticité", "N": "en manque d'élasticité", "O": "", "P": "en excès d'élasticité", "Q": "en excès important d'élasticité", "R": "en excès très important d'élasticité"},
+        "English": {"L": "with a very significant lack of elasticity", "M": "with a significant lack of elasticity", "N": "lacking elasticity", "O": "", "P": "with excessive elasticity", "Q": "with highly excessive elasticity", "R": "with a very high excess of elasticity"}
     }
 }
 
@@ -112,24 +120,6 @@ def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
         except:
             continue
     return default_value
-
-def format_params_grouped(data_dict, lang_dict, lang_name):
-    groups = {}
-    for k, v in data_dict.items():
-        if v != 10: groups.setdefault(v, []).append(lang_dict[k])
-    res = []
-    ints = {7: "en excès de", 4: "en excès important de", -7: "en manque de", -4: "en manque important de"} if lang_name == "Français" else {7: "excessive", 4: "highly excessive", -7: "lacking", -4: "highly lacking"}
-    for score, labels in groups.items():
-        prefix = ints.get(score, "")
-        if lang_name == "Français":
-            fmt = [f"d'{l}" if l[0] in "aeiouéèAEIOUÉÈ" else f"de {l}" for l in labels]
-            clean_p = prefix.rsplit(' ', 1)[0]
-            l_str = f" {lang_dict['and']} ".join([", ".join(fmt[:-1]), fmt[-1]]) if len(fmt) > 2 else f" {lang_dict['and']} ".join(fmt)
-            res.append(f"{clean_p} {l_str}")
-        else:
-            l_str = f" {lang_dict['and']} ".join([", ".join(labels[:-1]), labels[-1]]) if len(labels) > 2 else f" {lang_dict['and']} ".join(labels)
-            res.append(f"{prefix} {l_str}")
-    return res
 
 def join_final(lst, lang_dict):
     return f", ".join(lst[:-1]) + f" {lang_dict['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else lang_dict["equi"])
@@ -177,16 +167,18 @@ if uploaded_file:
         
         # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
         rp = find_label_score(df, "Relâchement", c_map)
-        f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         
-        # Extraction dynamique de tous les paramètres du pétrissage par colonne cochez
+        # Extraction dynamique des données du Pétrissage
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
         consistance_txt = get_description_by_column(df, 14, parametres_mapping["Consistance"][sel_lang], default_value="")
         extensibilite_txt = get_description_by_column(df, 15, parametres_mapping["Extensibilité"][sel_lang], default_value="")
         elasticite_txt = get_description_by_column(df, 16, parametres_mapping["Elasticité"][sel_lang], default_value="")
 
-        # Construction de la liste en suivant l'ordre strict demandé : 
-        # Collant -> Consistance -> Extensibilité -> Élasticité -> Relâchement
+        # Extraction dynamique des données du Façonnage (Ligne 22 et Ligne 24)
+        ext_fac_txt = get_description_by_column(df, 21, parametres_mapping["Extensibilité_Façonnage"][sel_lang], default_value="")
+        ela_fac_txt = get_description_by_column(df, 23, parametres_mapping["Elasticité_Façonnage"][sel_lang], default_value="")
+
+        # Construction de la liste en suivant l'ordre strict demandé
         def build_list(is_p=True):
             l = []
             if is_p:
@@ -196,8 +188,8 @@ if uploaded_file:
                 if elasticite_txt: l.append(elasticite_txt)
                 if rp != 10: l.append(t["rel"])
             else:
-                # Pour le façonnage, on conserve l'ancienne logique groupée basée sur f_data
-                l.extend(format_params_grouped(f_data, t, sel_lang))
+                if ext_fac_txt: l.append(ext_fac_txt)
+                if ela_fac_txt: l.append(ela_fac_txt)
             return l
 
         pl, fl = build_list(is_p=True), build_list(is_p=False)
