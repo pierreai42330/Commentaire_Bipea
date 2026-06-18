@@ -42,7 +42,7 @@ tr = {
         "p_fin": "En fin de pétrissage, pâte", "f_fac": "Au façonnage, pâte", "equi": "équilibrée",
         "same": "gardant le même profil tout au long du processus",
         "t_good": "Bonne tenue aux deux enfournements", "t_1": "au premier enfournement", "t_2": "au second",
-        "t_ok": "bonne tenue", "t_miss": "un manque de tenue", "t_miss_imp": "un manque important de tenue",
+        "t_ok": "bonne tenue",
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "sec": "section", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
@@ -54,7 +54,7 @@ tr = {
         "p_fin": "At the end of kneading, dough", "f_fac": "During shaping, dough", "equi": "balanced",
         "same": "keeping the same profile throughout the process",
         "t_good": "Good stability at both loadings", "t_1": "at the first loading", "t_2": "at the second",
-        "t_ok": "good stability", "t_miss": "lack of stability", "t_miss_imp": "significant lack of stability",
+        "t_ok": "good stability",
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
@@ -62,7 +62,6 @@ tr = {
     }
 }
 
-# Base sémantique pour générer les textes d'excès/manque
 libelles_intensite = {
     "Français": {
         "L": "en manque très important", "M": "en manque important", "N": "en manque",
@@ -87,9 +86,13 @@ parametres_mapping = {
         "Français": {"L": "en manque très important de consistance", "M": "en manque important de consistance", "N": "en manque de consistance", "O": "", "P": "en excès de consistance", "Q": "en excès important de consistance", "R": "en excès très important de consistance"},
         "English": {"L": "with a very significant lack of consistency", "M": "with a significant lack of consistency", "N": "lacking consistency", "O": "", "P": "with excessive consistency", "Q": "with highly excessive consistency", "R": "with a very high excess of consistency"}
     },
-    "Relâchement": {  # Ligne 18 (index 17)
+    "Relâchement": {
         "Français": {"L": "", "M": "", "N": "", "O": "", "P": "relachante", "Q": "très relachante", "R": "très relachante"},
         "English": {"L": "", "M": "", "N": "", "O": "", "P": "slackening", "Q": "highly slackening", "R": "highly slackening"}
+    },
+    "Tenue": {  # Lignes 31 et 32 (indices 30 et 31)
+        "Français": {"L": "une absence de tenue", "M": "un manque important de tenue", "N": "un manque de tenue", "O": "", "P": "", "Q": "", "R": ""},
+        "English": {"L": "an absence of stability", "M": "a significant lack of stability", "N": "a lack of stability", "O": "", "P": "", "Q": "", "R": ""}
     }
 }
 
@@ -109,7 +112,6 @@ def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
     letter = get_column_letter(df, row_idx)
     return mapping_lang.get(letter, default_value)
 
-# Fonction intelligente pour regrouper ou séparer l'extensibilité et l'élasticité
 def get_grouped_ext_ela(df, ext_row, ela_row, lang):
     ext_letter = get_column_letter(df, ext_row)
     ela_letter = get_column_letter(df, ela_row)
@@ -144,6 +146,12 @@ def get_score(df, idx, col_map):
             val = str(df.iloc[idx, col]).strip().upper()
             if val == 'X': return sc
         except: continue
+    return 10
+
+def find_label_score(df, label, col_map):
+    for i in range(len(df)):
+        vals = [str(v).strip().lower() for v in df.iloc[i].values]
+        if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
 
 def join_final(lst, lang_dict):
@@ -191,16 +199,15 @@ if uploaded_file:
         l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
         
         # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
-        # Extraction dynamique des données du Pétrissage
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
         consistance_txt = get_description_by_column(df, 14, parametres_mapping["Consistance"][sel_lang], default_value="")
         ext_ela_pétrissage = get_grouped_ext_ela(df, 15, 16, sel_lang)
         relachement_txt = get_description_by_column(df, 17, parametres_mapping["Relâchement"][sel_lang], default_value="")
 
-        # Extraction dynamique des données du Façonnage (Ligne 22 et Ligne 24)
+        # Extraction dynamique des données du Façonnage
         ext_ela_façonnage = get_grouped_ext_ela(df, 21, 23, sel_lang)
 
-        # Construction des listes finales selon l'ordre strict déterminé
+        # Construction des listes finales de pâte
         def build_list(is_p=True):
             l = []
             if is_p:
@@ -213,16 +220,18 @@ if uploaded_file:
             return l
 
         pl, fl = build_list(is_p=True), build_list(is_p=False)
-
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
-        # --- TENUE ---
-        t1, t2 = get_score(df, 30, c_map), get_score(df, 31, c_map)
-        def fmt_tenue(score):
-            if score == 10: return t["t_ok"]
-            if score == -4: return t["t_miss_imp"]
-            return t["t_miss"]
-        ten_txt = f" {t['t_good']}." if t1 == 10 and t2 == 10 else f" {fmt_tenue(t1).capitalize()} {t['t_1']} {t['and']} {fmt_tenue(t2)} {t['t_2']}."
+        # --- ANALYSE TENUE (Lignes 31 et 32 -> index 30 et 31) ---
+        t1_txt = get_description_by_column(df, 30, parametres_mapping["Tenue"][sel_lang], default_value="")
+        t2_txt = get_description_by_column(df, 31, parametres_mapping["Tenue"][sel_lang], default_value="")
+
+        if not t1_txt and not t2_txt:
+            ten_txt = f" {t['t_good']}."
+        else:
+            part_1 = f"{t1_txt if t1_txt else t['t_ok']} {t['t_1']}"
+            part_2 = f"{t2_txt if t2_txt else t['t_ok']} {t['t_2']}"
+            ten_txt = f" {part_1.capitalize()} {t['and']} {part_2}."
 
         # --- SEUILS ASPECT ---
         if n_asp >= 65: a_base = t["a_very"]
