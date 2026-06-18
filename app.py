@@ -46,7 +46,7 @@ tr = {
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
         "with": "avec", "sec": "section", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
-        "rel": "relâchante", "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
+        "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
     "English": {
         "header_warn": "⚠️ This comment is a working draft. Please review parameters and adjust hydration if needed before validation.",
@@ -58,7 +58,7 @@ tr = {
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
         "with": "with", "sec": "cross-section", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
-        "rel": "slackening", "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
+        "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
 }
 
@@ -86,6 +86,10 @@ parametres_mapping = {
     "Consistance": {
         "Français": {"L": "en manque très important de consistance", "M": "en manque important de consistance", "N": "en manque de consistance", "O": "", "P": "en excès de consistance", "Q": "en excès important de consistance", "R": "en excès très important de consistance"},
         "English": {"L": "with a very significant lack of consistency", "M": "with a significant lack of consistency", "N": "lacking consistency", "O": "", "P": "with excessive consistency", "Q": "with highly excessive consistency", "R": "with a very high excess of consistency"}
+    },
+    "Relâchement": {  # Ligne 18 (index 17)
+        "Français": {"L": "", "M": "", "N": "", "O": "", "P": "relachante", "Q": "très relachante", "R": "très relachante"},
+        "English": {"L": "", "M": "", "N": "", "O": "", "P": "slackening", "Q": "highly slackening", "R": "highly slackening"}
     }
 }
 
@@ -99,7 +103,7 @@ def get_column_letter(df, row_idx):
                 return letter
         except:
             continue
-    return "O" # Par défaut, colonne neutre si rien n'est coché
+    return "O"
 
 def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
     letter = get_column_letter(df, row_idx)
@@ -114,20 +118,16 @@ def get_grouped_ext_ela(df, ext_row, ela_row, lang):
     label_ela = "élasticité" if lang == "Français" else "elasticity"
     conj = "et" if lang == "Français" else "and"
 
-    # Si les deux sont en 'O', aucun commentaire
     if ext_letter == "O" and ela_letter == "O":
         return []
 
-    # Cas 1 : Même colonne cochée -> Regroupement de la phrase
     if ext_letter == ela_letter:
         prefixe = libelles_intensite[lang][ext_letter]
         if lang == "Français":
-            # Gestion élégante de l'apostrophe pour d'extensibilité et d'élasticité
             return [f"{prefixe} d'{label_ext} {conj} d'{label_ela}"]
         else:
             return [f"{prefixe} {label_ext} {conj} {label_ela}"]
             
-    # Cas 2 : Colonnes différentes -> Phrases séparées individuelles
     res = []
     if ext_letter != "O":
         prefixe_ext = libelles_intensite[lang][ext_letter]
@@ -144,12 +144,6 @@ def get_score(df, idx, col_map):
             val = str(df.iloc[idx, col]).strip().upper()
             if val == 'X': return sc
         except: continue
-    return 10
-
-def find_label_score(df, label, col_map):
-    for i in range(len(df)):
-        vals = [str(v).strip().lower() for v in df.iloc[i].values]
-        if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
 
 def join_final(lst, lang_dict):
@@ -197,26 +191,23 @@ if uploaded_file:
         l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
         
         # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
-        rp = find_label_score(df, "Relâchement", c_map)
-        
-        # Extraction brute des premiers éléments du pétrissage
+        # Extraction dynamique des données du Pétrissage
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
         consistance_txt = get_description_by_column(df, 14, parametres_mapping["Consistance"][sel_lang], default_value="")
-
-        # Récupération intelligente (avec regroupement si identique) pour le Pétrissage (Lignes 16 et 17 -> index 15 et 16)
         ext_ela_pétrissage = get_grouped_ext_ela(df, 15, 16, sel_lang)
+        relachement_txt = get_description_by_column(df, 17, parametres_mapping["Relâchement"][sel_lang], default_value="")
 
-        # Récupération intelligente pour le Façonnage (Lignes 22 et 24 -> index 21 et 23)
+        # Extraction dynamique des données du Façonnage (Ligne 22 et Ligne 24)
         ext_ela_façonnage = get_grouped_ext_ela(df, 21, 23, sel_lang)
 
-        # Construction des listes finales
+        # Construction des listes finales selon l'ordre strict déterminé
         def build_list(is_p=True):
             l = []
             if is_p:
                 if collant_txt: l.append(collant_txt)
                 if consistance_txt: l.append(consistance_txt)
                 if ext_ela_pétrissage: l.extend(ext_ela_pétrissage)
-                if rp != 10: l.append(t["rel"])
+                if relachement_txt: l.append(relachement_txt)
             else:
                 if ext_ela_façonnage: l.extend(ext_ela_façonnage)
             return l
