@@ -163,28 +163,32 @@ if uploaded_file:
         m4.metric("VOLUME", f"{int(vol)} cm³")
 
         # --- ANALYSE LISSAGE ---
-        # Lissage : Ligne 13 Excel -> Index Python 12
         l_txt = get_description_by_column(df, 12, parametres_mapping["Lissage"][sel_lang], default_value="Lissage correct")
         
-        # --- ANALYSE PÂTE COMPLÉMENTAIRE & COLLANT ---
+        # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
         p_data = {"cons": find_label_score(df, "Consistance", c_map), "ext": find_label_score(df, "Extensibilité", c_map), "ela": find_label_score(df, "Elasticité", c_map)}
         rp = find_label_score(df, "Relâchement", c_map)
         f_data = {"ext": get_score(df, 21, c_map), "ela": get_score(df, 23, c_map)}
         
-        # Collant : Ligne 14 Excel -> Index Python 13
+        # Extraction du collant (Ligne 14 Excel -> Index Python 13)
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
 
+        # Fonction de construction révisée pour respecter l'ordre strict demandé
         def build_list(data, rel=10, is_p=True):
             l = []
+            # 1. Si c'est le pétrissage et qu'il y a du collant, on le met au tout début
+            if is_p and collant_txt:
+                l.append(collant_txt)
+            
+            # 2. Consistance, extensibilité, élasticité (gérés par format_params_grouped)
             l.extend(format_params_grouped(data, t, sel_lang))
-            if is_p and rel != 10: l.append(t["rel"])
+            
+            # 3. Relâchement (à la fin si présent)
+            if is_p and rel != 10: 
+                l.append(t["rel"])
             return l
 
         pl, fl = build_list(p_data, rp, True), build_list(f_data, is_p=False)
-        
-        # Insertion du collant uniquement dans la liste du pétrissage (pl) s'il existe
-        if collant_txt:
-            pl.append(collant_txt)
 
         pate_txt = f"{t['p_direct']} {join_final(pl, t)} {t['same']}." if pl == fl else f"{t['p_fin']} {join_final(pl, t)}. {t['f_fac']} {join_final(fl, t)}."
 
