@@ -62,39 +62,82 @@ tr = {
     }
 }
 
-# Configuration des dictionnaires personnalisés par ligne et par colonne
+# Base sémantique pour générer les textes d'excès/manque
+libelles_intensite = {
+    "Français": {
+        "L": "en manque très important", "M": "en manque important", "N": "en manque",
+        "O": "", "P": "en excès", "Q": "en excès important", "R": "en excès très important"
+    },
+    "English": {
+        "L": "with a very significant lack", "M": "with a significant lack", "N": "lacking",
+        "O": "", "P": "with excessive", "Q": "with highly excessive", "R": "with a very high excess"
+    }
+}
+
 parametres_mapping = {
-    "Lissage": {  # Ligne 13 (index 12)
+    "Lissage": {
         "Français": {"L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", "O": "Bon lissage", "P": "Lissage un peu rapide"},
         "English": {"L": "Very slow smoothing", "M": "Slow smoothing", "N": "Slightly slow smoothing", "O": "Good smoothing", "P": "Slightly fast smoothing"}
     },
-    "Collant": {  # Ligne 14 (index 13)
+    "Collant": {
         "Français": {"O": "", "P": "collante", "Q": "très collante", "R": "très collante"},
         "English": {"O": "", "P": "sticky", "Q": "very sticky", "R": "very sticky"}
     },
-    "Consistance": {  # Ligne 15 (index 14)
+    "Consistance": {
         "Français": {"L": "en manque très important de consistance", "M": "en manque important de consistance", "N": "en manque de consistance", "O": "", "P": "en excès de consistance", "Q": "en excès important de consistance", "R": "en excès très important de consistance"},
         "English": {"L": "with a very significant lack of consistency", "M": "with a significant lack of consistency", "N": "lacking consistency", "O": "", "P": "with excessive consistency", "Q": "with highly excessive consistency", "R": "with a very high excess of consistency"}
-    },
-    "Extensibilité": {  # Ligne 16 (index 15)
-        "Français": {"L": "en manque très important d'extensibilité", "M": "en manque important d'extensibilité", "N": "en manque d'extensibilité", "O": "", "P": "en excès d'extensibilité", "Q": "en excès important d'extensibilité", "R": "en excès très important d'extensibilité"},
-        "English": {"L": "with a very significant lack of extensibility", "M": "with a significant lack of extensibility", "N": "lacking extensibility", "O": "", "P": "with excessive extensibility", "Q": "with highly excessive extensibility", "R": "with a very high excess of extensibility"}
-    },
-    "Elasticité": {  # Ligne 17 (index 16)
-        "Français": {"L": "en manque très important d'élasticité", "M": "en manque important d'élasticité", "N": "en manque d'élasticité", "O": "", "P": "en excès d'élasticité", "Q": "en excès important d'élasticité", "R": "en excès très important d'élasticité"},
-        "English": {"L": "with a very significant lack of elasticity", "M": "with a significant lack of elasticity", "N": "lacking elasticity", "O": "", "P": "with excessive elasticity", "Q": "with highly excessive elasticity", "R": "with a very high excess of elasticity"}
-    },
-    "Extensibilité_Façonnage": {  # Ligne 22 (index 21)
-        "Français": {"L": "en manque très important d'extensibilité", "M": "en manque important d'extensibilité", "N": "en manque d'extensibilité", "O": "", "P": "en excès d'extensibilité", "Q": "en excès important d'extensibilité", "R": "en excès très important d'extensibilité"},
-        "English": {"L": "with a very significant lack of extensibility", "M": "with a significant lack of extensibility", "N": "lacking extensibility", "O": "", "P": "with excessive extensibility", "Q": "with highly excessive extensibility", "R": "with a very high excess of extensibility"}
-    },
-    "Elasticité_Façonnage": {  # Ligne 24 (index 23)
-        "Français": {"L": "en manque très important d'élasticité", "M": "en manque important d'élasticité", "N": "en manque d'élasticité", "O": "", "P": "en excès d'élasticité", "Q": "en excès important d'élasticité", "R": "en excès très important d'élasticité"},
-        "English": {"L": "with a very significant lack of elasticity", "M": "with a significant lack of elasticity", "N": "lacking elasticity", "O": "", "P": "with excessive elasticity", "Q": "with highly excessive elasticity", "R": "with a very high excess of elasticity"}
     }
 }
 
 # --- 3. FONCTIONS LOGIQUES ---
+def get_column_letter(df, row_idx):
+    col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17}
+    for letter, col_idx in col_letter_to_idx.items():
+        try:
+            val = str(df.iloc[row_idx, col_idx]).strip().upper()
+            if val == 'X':
+                return letter
+        except:
+            continue
+    return "O" # Par défaut, colonne neutre si rien n'est coché
+
+def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
+    letter = get_column_letter(df, row_idx)
+    return mapping_lang.get(letter, default_value)
+
+# Fonction intelligente pour regrouper ou séparer l'extensibilité et l'élasticité
+def get_grouped_ext_ela(df, ext_row, ela_row, lang):
+    ext_letter = get_column_letter(df, ext_row)
+    ela_letter = get_column_letter(df, ela_row)
+    
+    label_ext = "extensibilité" if lang == "Français" else "extensibility"
+    label_ela = "élasticité" if lang == "Français" else "elasticity"
+    conj = "et" if lang == "Français" else "and"
+
+    # Si les deux sont en 'O', aucun commentaire
+    if ext_letter == "O" and ela_letter == "O":
+        return []
+
+    # Cas 1 : Même colonne cochée -> Regroupement de la phrase
+    if ext_letter == ela_letter:
+        prefixe = libelles_intensite[lang][ext_letter]
+        if lang == "Français":
+            # Gestion élégante de l'apostrophe pour d'extensibilité et d'élasticité
+            return [f"{prefixe} d'{label_ext} {conj} d'{label_ela}"]
+        else:
+            return [f"{prefixe} {label_ext} {conj} {label_ela}"]
+            
+    # Cas 2 : Colonnes différentes -> Phrases séparées individuelles
+    res = []
+    if ext_letter != "O":
+        prefixe_ext = libelles_intensite[lang][ext_letter]
+        res.append(f"{prefixe_ext} d'{label_ext}" if lang == "Français" else f"{prefixe_ext} {label_ext}")
+    if ela_letter != "O":
+        prefixe_ela = libelles_intensite[lang][ela_letter]
+        res.append(f"{prefixe_ela} d'{label_ela}" if lang == "Français" else f"{prefixe_ela} {label_ela}")
+        
+    return res
+
 def get_score(df, idx, col_map):
     for col, sc in col_map.items():
         try:
@@ -108,18 +151,6 @@ def find_label_score(df, label, col_map):
         vals = [str(v).strip().lower() for v in df.iloc[i].values]
         if any(label.lower() in s for s in vals): return get_score(df, i, col_map)
     return 10
-
-# Fonction universelle pour extraire la description d'une ligne selon la lettre de la colonne cochée
-def get_description_by_column(df, row_idx, mapping_lang, default_value=""):
-    col_letter_to_idx = {"L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17}
-    for letter, col_idx in col_letter_to_idx.items():
-        try:
-            val = str(df.iloc[row_idx, col_idx]).strip().upper()
-            if val == 'X':
-                return mapping_lang.get(letter, default_value)
-        except:
-            continue
-    return default_value
 
 def join_final(lst, lang_dict):
     return f", ".join(lst[:-1]) + f" {lang_dict['and']} " + lst[-1] if len(lst) > 1 else (lst[0] if lst else lang_dict["equi"])
@@ -148,7 +179,7 @@ if uploaded_file:
         c_map = {11: -1, 12: -4, 13: -7, 14: 10, 15: 7, 16: 4, 17: 1}
         
         # --- LECTURE NOTES ---
-        n_hydra_score = safe_float(df, 30, 1) # B31
+        n_hydra_score = safe_float(df, 30, 1)
         hydra_pct = safe_float(df, 30, 1)
         n_pate = safe_float(df, 30, 5)
         n_asp = safe_float(df, 33, 5)
@@ -168,28 +199,26 @@ if uploaded_file:
         # --- ANALYSE PÂTE COMPLÉMENTAIRE ---
         rp = find_label_score(df, "Relâchement", c_map)
         
-        # Extraction dynamique des données du Pétrissage
+        # Extraction brute des premiers éléments du pétrissage
         collant_txt = get_description_by_column(df, 13, parametres_mapping["Collant"][sel_lang], default_value="")
         consistance_txt = get_description_by_column(df, 14, parametres_mapping["Consistance"][sel_lang], default_value="")
-        extensibilite_txt = get_description_by_column(df, 15, parametres_mapping["Extensibilité"][sel_lang], default_value="")
-        elasticite_txt = get_description_by_column(df, 16, parametres_mapping["Elasticité"][sel_lang], default_value="")
 
-        # Extraction dynamique des données du Façonnage (Ligne 22 et Ligne 24)
-        ext_fac_txt = get_description_by_column(df, 21, parametres_mapping["Extensibilité_Façonnage"][sel_lang], default_value="")
-        ela_fac_txt = get_description_by_column(df, 23, parametres_mapping["Elasticité_Façonnage"][sel_lang], default_value="")
+        # Récupération intelligente (avec regroupement si identique) pour le Pétrissage (Lignes 16 et 17 -> index 15 et 16)
+        ext_ela_pétrissage = get_grouped_ext_ela(df, 15, 16, sel_lang)
 
-        # Construction de la liste en suivant l'ordre strict demandé
+        # Récupération intelligente pour le Façonnage (Lignes 22 et 24 -> index 21 et 23)
+        ext_ela_façonnage = get_grouped_ext_ela(df, 21, 23, sel_lang)
+
+        # Construction des listes finales
         def build_list(is_p=True):
             l = []
             if is_p:
                 if collant_txt: l.append(collant_txt)
                 if consistance_txt: l.append(consistance_txt)
-                if extensibilite_txt: l.append(extensibilite_txt)
-                if elasticite_txt: l.append(elasticite_txt)
+                if ext_ela_pétrissage: l.extend(ext_ela_pétrissage)
                 if rp != 10: l.append(t["rel"])
             else:
-                if ext_fac_txt: l.append(ext_fac_txt)
-                if ela_fac_txt: l.append(ela_fac_txt)
+                if ext_ela_façonnage: l.extend(ext_ela_façonnage)
             return l
 
         pl, fl = build_list(is_p=True), build_list(is_p=False)
