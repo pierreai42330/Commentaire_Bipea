@@ -73,6 +73,7 @@ libelles_intensite = {
     }
 }
 
+# Mapping allégé contenant uniquement les qualificatifs (le type "manque/excès de" est géré dynamiquement)
 parametres_mapping = {
     "Lissage": {
         "Français": {"L": "Lissage très lent", "M": "Lissage lent", "N": "Lissage un peu lent", "O": "Bon lissage", "P": "Lissage un peu rapide"},
@@ -93,14 +94,6 @@ parametres_mapping = {
     "Tenue": {
         "Français": {"L": "une absence de tenue", "M": "un manque important de tenue", "N": "un manque de tenue", "O": "", "P": "", "Q": "", "R": ""},
         "English": {"L": "an absence of stability", "M": "a significant lack of stability", "N": "a lack of stability", "O": "", "P": "", "Q": "", "R": ""}
-    },
-    "Section": {
-        "Français": {"L": "un manque très important de section", "M": "un manque important de section", "N": "un manque de section", "O": "", "P": "un excès de section", "Q": "un excès important de section", "R": "un excès très important de section"},
-        "English": {"L": "a very significant lack of cross-section", "M": "a significant lack of cross-section", "N": "a lack of cross-section", "O": "", "P": "an excess of cross-section", "Q": "a significant excess of cross-section", "R": "a very significant excess of cross-section"}
-    },
-    "Grigne_Developpement": {  # Ligne 38 (index 37)
-        "Français": {"L": "une absence de développement du coup de lame", "M": "un manque important de développement du coup de lame", "N": "un manque de développement du coup de lame", "O": "", "P": "un excès de développement du coup de lame", "Q": "", "R": ""},
-        "English": {"L": "an absence of blade cut development", "M": "a significant lack of blade cut development", "N": "a lack of blade cut development", "O": "", "P": "an excess of blade cut development", "Q": "", "R": ""}
     }
 }
 
@@ -242,19 +235,54 @@ if uploaded_file:
         elif n_asp >= 30: a_base = t["a_cor"]
         else: a_base = t["a_poor"]
 
-        # --- ANALYSE DÉTAILLÉE ASPECT ---
-        sec_txt = get_description_by_column(df, 33, parametres_mapping["Section"][sel_lang], default_value="")
-        grigne_dev_txt = get_description_by_column(df, 37, parametres_mapping["Grigne_Developpement"][sel_lang], default_value="")
-        
-        col_v = get_score(df, 34, c_map)
-        dec_v = get_score(df, 39, c_map)
+        # --- ANALYSE EN PROFONDEUR DE L'ASPECT (SECTION & GRIGNE) ---
+        sec_lettre = get_column_letter(df, 33)   # Ligne 34
+        gri_lettre = get_column_letter(df, 37)   # Ligne 38
+        col_v = get_score(df, 34, c_map)          # Ligne 35
+        dec_v = get_score(df, 39, c_map)          # Ligne 40
 
-        s_asp = []
-        if sec_txt: s_asp.append(sec_txt)
-        if grigne_dev_txt: s_asp.append(grigne_dev_txt)
-        if dec_v in [7, 4]: s_asp.append(t["dec"])
-        
-        asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
+        # Dictionnaires internes de qualificatifs pour l'aspect (Français/English)
+        mots_intensite = {
+            "Français": {"L": "absence de ", "M": "manque important de ", "N": "manque de ", "O": "", "P": "excès de "},
+            "English": {"L": "absence of ", "M": "significant lack of ", "N": "lack of ", "O": "", "P": "excess of "}
+        }
+        labels_aspect = {
+            "Français": {"sec": "section", "gri": "développement du coup de lame"},
+            "English": {"sec": "cross-section", "gri": "blade cut development"}
+        }
+
+        aspect_elements = []
+
+        # Cas regroupé intelligent : Si section et développement partagent exactement la même anomalie (ex: "manque de")
+        if sec_lettre == gri_lettre and sec_lettre in ["L", "M", "N", "P"]:
+            qualif = mots_intensite[sel_lang][sec_lettre]
+            lbl_sec = labels_aspect[sel_lang]["sec"]
+            lbl_gri = labels_aspect[sel_lang]["gri"]
+            conj = t["and"]
+            aspect_elements.append(f"un {qualif}{lbl_sec}, de {lbl_gri}" if sel_lang == "Français" else f"a {qualif}{lbl_sec}, and {lbl_gri}")
+        else:
+            # Traitement séparé individuel si différents
+            if sec_lettre in ["L", "M", "N", "P"]:
+                qualif = mots_intensite[sel_lang][sec_lettre]
+                lbl = labels_aspect[sel_lang]["sec"]
+                aspect_elements.append(f"un {qualif}{lbl}" if sel_lang == "Français" else f"a {qualif}{lbl}")
+            if gri_lettre in ["L", "M", "N", "P"]:
+                qualif = mots_intensite[sel_lang][gri_lettre]
+                lbl = labels_aspect[sel_lang]["gri"]
+                aspect_elements.append(f"un {qualif}{lbl}" if sel_lang == "Français" else f"a {qualif}{lbl}")
+
+        # Ajout final du déchirement (avec préfixe "avec" s'il y a d'autres éléments, sinon directement)
+        if dec_v in [7, 4]:
+            if aspect_elements and sel_lang == "Français":
+                # Jointure propre des anomalies précédentes, suivie de "et avec un déchirement..."
+                phrase_prev = ", ".join(aspect_elements[:-1]) + f" {t['and']} " + aspect_elements[-1] if len(aspect_elements) > 1 else aspect_elements[0]
+                asp_f = f"{a_base} {t['with']} {phrase_prev} {t['and']} avec {t['dec']}"
+            else:
+                aspect_elements.append(t["dec"])
+                asp_f = f"{a_base} {t['with']} " + join_final(aspect_elements, t)
+        else:
+            asp_f = a_base + (f" {t['with']} " + join_final(aspect_elements, t) if aspect_elements else "")
+
         col_txt = f"Un manque de {t['col']}." if col_v < 10 else ""
 
         # --- VOLUME ET FINAL ---
