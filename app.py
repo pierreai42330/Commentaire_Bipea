@@ -44,7 +44,7 @@ tr = {
         "t_good": "Bonne tenue aux deux enfournements", "t_1": "au premier enfournement", "t_2": "au second",
         "t_ok": "bonne tenue",
         "a_very": "Très bel aspect des pains", "a_good": "Bel aspect des pains", "a_med": "Assez bel aspect des pains", "a_cor": "Aspect correct des pains", "a_poor": "Aspect médiocre des pains",
-        "with": "avec", "dev": "développement", "reg": "régularité", "grigne": "du coup de lame", "dec": "un déchirement du coup de lame",
+        "with": "avec", "dec": "un déchirement du coup de lame",
         "col": "coloration de la croûte", "v_very": "Très bon volume", "v_good": "Bon volume", "v_sat": "Volume satisfaisant",
         "and": "et", "copy_btn": "📋 Copier le commentaire", "p_direct": "Pâte"
     },
@@ -56,7 +56,7 @@ tr = {
         "t_good": "Good stability at both loadings", "t_1": "at the first loading", "t_2": "at the second",
         "t_ok": "good stability",
         "a_very": "Very beautiful appearance", "a_good": "Beautiful appearance", "a_med": "Fairly beautiful appearance", "a_cor": "Correct appearance", "a_poor": "Poor appearance",
-        "with": "with", "dev": "development", "reg": "regularity", "grigne": "of the blade cut", "dec": "tearing of the blade cut",
+        "with": "with", "dec": "tearing of the blade cut",
         "col": "crust coloration", "v_very": "Very good volume", "v_good": "Good volume", "v_sat": "Satisfactory volume",
         "and": "and", "copy_btn": "📋 Copy comment", "p_direct": "Dough"
     }
@@ -94,9 +94,13 @@ parametres_mapping = {
         "Français": {"L": "une absence de tenue", "M": "un manque important de tenue", "N": "un manque de tenue", "O": "", "P": "", "Q": "", "R": ""},
         "English": {"L": "an absence of stability", "M": "a significant lack of stability", "N": "a lack of stability", "O": "", "P": "", "Q": "", "R": ""}
     },
-    "Section": {  # Ligne 34 (index 33)
+    "Section": {
         "Français": {"L": "un manque très important de section", "M": "un manque important de section", "N": "un manque de section", "O": "", "P": "un excès de section", "Q": "un excès important de section", "R": "un excès très important de section"},
         "English": {"L": "a very significant lack of cross-section", "M": "a significant lack of cross-section", "N": "a lack of cross-section", "O": "", "P": "an excess of cross-section", "Q": "a significant excess of cross-section", "R": "a very significant excess of cross-section"}
+    },
+    "Grigne_Developpement": {  # Ligne 38 (index 37)
+        "Français": {"L": "une absence de développement du coup de lame", "M": "un manque important de développement du coup de lame", "N": "un manque de développement du coup de lame", "O": "", "P": "un excès de développement du coup de lame", "Q": "", "R": ""},
+        "English": {"L": "an absence of blade cut development", "M": "a significant lack of blade cut development", "N": "a lack of blade cut development", "O": "", "P": "an excess of blade cut development", "Q": "", "R": ""}
     }
 }
 
@@ -240,21 +244,14 @@ if uploaded_file:
 
         # --- ANALYSE DÉTAILLÉE ASPECT ---
         sec_txt = get_description_by_column(df, 33, parametres_mapping["Section"][sel_lang], default_value="")
+        grigne_dev_txt = get_description_by_column(df, 37, parametres_mapping["Grigne_Developpement"][sel_lang], default_value="")
+        
         col_v = get_score(df, 34, c_map)
-        dev_v = get_score(df, 37, c_map)
-        reg_v = get_score(df, 38, c_map)
         dec_v = get_score(df, 39, c_map)
 
         s_asp = []
         if sec_txt: s_asp.append(sec_txt)
-        
-        if dev_v != 10 or reg_v != 10:
-            if dev_v == reg_v:
-                s_asp.append(f"{'un excès' if dev_v > 10 else 'un manque'} de {t['dev']} {t['and']} de {t['reg']} {t['grigne']}")
-            else:
-                g_tmp = [f"{'un excès' if v > 10 else 'un manque'} de {t[k]}" for v, k in [(dev_v, 'dev'), (reg_v, 'reg')] if v != 10]
-                s_asp.append(f"{' '.join(g_tmp)} {t['grigne']}")
-        
+        if grigne_dev_txt: s_asp.append(grigne_dev_txt)
         if dec_v in [7, 4]: s_asp.append(t["dec"])
         
         asp_f = a_base + (f" {t['with']} " + join_final(s_asp, t) if s_asp else "")
